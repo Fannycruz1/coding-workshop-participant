@@ -256,3 +256,18 @@ tfplan
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
+
+*.md
+
+# bin/start-dev.sh pip-installs each service's deps into backend/<service>/ so
+# LocalStack's hot-reload mount can import them. Vendored libs, not our code.
+backend/*/.pip_installed
+backend/*/*.dist-info/
+backend/*/*.libs/
+backend/*/annotated_types/
+backend/*/bcrypt/
+backend/*/jwt/
+backend/*/psycopg*/
+backend/*/pydantic*/
+backend/*/typing_extensions.py
+backend/*/typing_inspection/
