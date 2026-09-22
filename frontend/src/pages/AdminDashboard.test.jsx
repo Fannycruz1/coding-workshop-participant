@@ -1,4 +1,4 @@
-import { render, act, cleanup } from '@testing-library/react'
+import { render, act, cleanup, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -27,6 +27,12 @@ const BODIES = {
   '/incidents': { incidents: Array.from({ length: PAGE_SIZE }, (_, i) => incident(i + 1)) },
   '/escalations': { escalations: [] },
   '/notes': { notes: [] },
+  '/stats/hotspots': {
+    buildings: [{ id: 1, name: 'HQ', count: 7 }, { id: 2, name: 'Annex', count: 2 }],
+    floors: [{ id: 10, name: 'Floor 1', count: 5 }],
+    reporters: [{ id: 9, name: 'Alex', count: 4 }],
+  },
+  '/stats/categories': { categories: [{ category: 'HVAC', count: 6 }] },
 }
 
 const calls = []
@@ -81,4 +87,18 @@ test('the incident list asks for a bounded page', async () => {
 
   const list = calls.find((call) => call.includes('/incidents'))
   expect(list).toBe(`/api/incidents-service/incidents?limit=${PAGE_SIZE}`)
+})
+
+test('stats load only once the tab is opened, and show every group', async () => {
+  await renderAdmin()
+  expect(calls.filter((call) => call.includes('/stats'))).toEqual([])
+
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Stats' })))
+
+  for (const heading of ['Buildings', 'Floors', 'Reporters', 'Categories']) {
+    expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
+  }
+  // Every row is one <meter>, the biggest count setting the scale.
+  expect(screen.getAllByRole('meter').length).toBe(5)
+  expect(screen.getByText('HVAC')).toBeTruthy()
 })

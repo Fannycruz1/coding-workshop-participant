@@ -161,3 +161,5 @@ button.active { background: var(--accent); color: #fff; }
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+.rows meter { flex: 1; min-width: 4rem; }

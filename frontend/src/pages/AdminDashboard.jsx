@@ -9,7 +9,8 @@ import { useFacilities, useIncidents } from '../lib/data'
 import { CATEGORIES, PAGE_SIZE } from '../lib/constants'
 
 const NO_FILTERS = { status: '', category: '', priority: '', q: '' }
-const TABS = ['Incidents', 'Escalations', 'Facilities', 'Engineers']
+const TABS = ['Incidents', 'Escalations', 'Facilities', 'Engineers', 'Stats']
+const HOTSPOT_GROUPS = { buildings: 'Buildings', floors: 'Floors', reporters: 'Reporters' }
 
 function useEngineers() {
   const api = useApi()
@@ -293,6 +294,55 @@ function Engineers({ engineers, reload }) {
   )
 }
 
+// --- stats -----------------------------------------------------------------
+
+/** A top-N list. <meter> draws the bar, so there is no chart library here. */
+function TopList({ title, rows }) {
+  const most = Math.max(...rows.map((row) => row.count), 1)
+  return (
+    <section className="card">
+      <h2>{title}</h2>
+      {rows.length === 0 && <p className="muted">No incidents yet.</p>}
+      <ul className="rows">
+        {rows.map((row) => (
+          <li key={row.id ?? row.name}>
+            <span>{row.name}</span>
+            <meter value={row.count} max={most} />
+            <span>{row.count}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function Stats() {
+  const api = useApi()
+  const [stats, setStats] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    Promise.all([api('/stats-service/stats/hotspots'), api('/stats-service/stats/categories')])
+      .then(([hotspots, categories]) => setStats({ ...hotspots, categories: categories.categories }))
+      .catch((err) => setError(err.message))
+  }, [api])
+
+  if (error) return <p role="alert">{error}</p>
+  if (!stats) return <p className="muted">Loading…</p>
+
+  return (
+    <>
+      {Object.entries(HOTSPOT_GROUPS).map(([group, title]) => (
+        <TopList key={group} title={title} rows={stats[group]} />
+      ))}
+      <TopList
+        title="Categories"
+        rows={stats.categories.map((row) => ({ name: row.category, count: row.count }))}
+      />
+    </>
+  )
+}
+
 export default function AdminDashboard() {
   const [tab, setTab] = useState('Incidents')
   const facilities = useFacilities()
@@ -318,6 +368,7 @@ export default function AdminDashboard() {
       {tab === 'Escalations' && <Escalations />}
       {tab === 'Facilities' && <Facilities facilities={facilities} />}
       {tab === 'Engineers' && <Engineers engineers={engineers} reload={reload} />}
+      {tab === 'Stats' && <Stats />}
     </main>
   )
 }
