@@ -133,3 +133,144 @@ def test_malformed_body_rejected():
 def test_double_slash_path():
     # The dev proxy forwards "//me"; it must reach the same route as "/me".
     assert call("GET", "//me", token=login(EMPLOYEE))[0] == 200
+
+
+# --- Phase 5: engineer profile CRUD, admin only ---------------------------
+
+@pytest.fixture
+def engineer(new_email):
+    status, body = call("POST", "/engineers", {
+        "email": new_email, "password": PASSWORD, "full_name": "Phase 5 Eng",
+        "specialty": "Plumbing", "phone": "555-0199",
+    }, token=login(ADMIN))
+    assert status == 201, body
+    return body["user"]
+
+
+def test_list_engineers_includes_profiles(engineer):
+    status, body = call("GET", "/engineers", token=login(ADMIN))
+    assert status == 200, body
+    listed = {e["id"]: e for e in body["engineers"]}
+    assert listed[engineer["id"]]["specialty"] == "Plumbing"
+    assert listed[engineer["id"]]["phone"] == "555-0199"
+    assert all(e["role"] == "engineer" for e in body["engineers"])
+    assert "password" not in listed[engineer["id"]]
+
+
+def test_update_engineer_profile(engineer):
+    status, body = call("PATCH", f"/engineers/{engineer['id']}", {
+        "specialty": "Network", "phone": "555-0200",
+    }, token=login(ADMIN))
+    assert status == 200, body
+    assert body["engineer"]["specialty"] == "Network"
+    assert body["engineer"]["phone"] == "555-0200"
+
+
+def test_update_engineer_partially(engineer):
+    status, body = call(
+        "PATCH", f"/engineers/{engineer['id']}", {"phone": "555-0300"}, token=login(ADMIN)
+    )
+    assert status == 200, body
+    assert body["engineer"]["phone"] == "555-0300"
+    assert body["engineer"]["specialty"] == "Plumbing"  # untouched
+
+
+def test_update_engineer_empty_body_rejected(engineer):
+    status, _ = call("PATCH", f"/engineers/{engineer['id']}", {}, token=login(ADMIN))
+    assert status == 400
+
+
+def test_update_non_engineer_is_404(engineer):
+    """The route edits engineers; an employee id must not be reachable through it."""
+    status, _ = call("PATCH", "/engineers/999999999", {"phone": "x"}, token=login(ADMIN))
+    assert status == 404
+
+
+@pytest.mark.parametrize("method", ["PATCH", "DELETE"])
+def test_engineer_routes_cannot_touch_a_non_engineer(method):
+    """/engineers/{id} must not become a back door for editing or deleting any user."""
+    employee_id = call("GET", "/me", token=login(EMPLOYEE))[1]["id"]
+    assert call(method, f"/engineers/{employee_id}", {"phone": "x"}, token=login(ADMIN))[0] == 404
+    assert call("GET", "/me", token=login(EMPLOYEE))[0] == 200  # still active, still there
+
+
+def test_delete_engineer_deactivates_and_hides_them(engineer):
+    """Soft delete: the row stays for the audit trail, the account stops working."""
+    from db import connect
+
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 200
+    status, body = call("GET", "/engineers", token=login(ADMIN))
+    assert engineer["id"] not in [e["id"] for e in body["engineers"]]
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT is_active FROM users WHERE id = %s", (engineer["id"],)
+        ).fetchone()
+    assert row is not None and row[0] is False
+
+
+def test_deactivated_engineer_cannot_log_in(engineer):
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 200
+    status, _ = call("POST", "/login", {"email": engineer["email"], "password": PASSWORD})
+    assert status == 401
+
+
+def test_deactivated_engineer_is_gone_from_the_api(engineer):
+    """Once deactivated they are not there any more: no second delete, no edits."""
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 200
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 404
+    status, _ = call("PATCH", f"/engineers/{engineer['id']}", {"phone": "x"}, token=login(ADMIN))
+    assert status == 404
+
+
+def _assign_incident_to(engineer_id):
+    """A fresh incident assigned to this engineer. Returns its id."""
+    from db import connect
+
+    with connect() as conn:
+        return conn.execute(
+            "INSERT INTO incidents (title, category, created_by, assigned_to,"
+            " building_id, floor_id) SELECT 'fk guard', 'Other', u.id, %s,"
+            " i.building_id, i.floor_id FROM users u, incidents i"
+            " WHERE u.email = %s LIMIT 1 RETURNING id",
+            (engineer_id, EMPLOYEE),
+        ).fetchone()[0]
+
+
+def test_delete_engineer_unassigns_their_incidents(engineer):
+    """incidents.assigned_to has no ON DELETE rule, so the work goes back to the pool."""
+    from db import connect
+
+    incident_id = _assign_incident_to(engineer["id"])
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 200
+    with connect() as conn:
+        assigned = conn.execute(
+            "SELECT assigned_to FROM incidents WHERE id = %s", (incident_id,)
+        ).fetchone()[0]
+    assert assigned is None  # unclaimed, not deleted along with them
+
+
+def test_delete_engineer_keeps_their_audit_trail(engineer):
+    """The point of the soft delete: notes written by a departed engineer survive."""
+    from db import connect
+
+    incident_id = _assign_incident_to(engineer["id"])
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO incident_notes (incident_id, author_id, body)"
+            " VALUES (%s, %s, 'on my way')",
+            (incident_id, engineer["id"]),
+        )
+    assert call("DELETE", f"/engineers/{engineer['id']}", token=login(ADMIN))[0] == 200
+    with connect() as conn:
+        notes = conn.execute(
+            "SELECT count(*) FROM incident_notes WHERE author_id = %s", (engineer["id"],)
+        ).fetchone()[0]
+    assert notes == 1
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/engineers"), ("PATCH", "/engineers/1"), ("DELETE", "/engineers/1"),
+])
+def test_engineer_routes_are_admin_only(method, path):
+    assert call(method, path, {"phone": "x"}, token=login(EMPLOYEE))[0] == 403
+    assert call(method, path, {"phone": "x"})[0] == 401

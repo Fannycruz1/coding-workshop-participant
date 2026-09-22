@@ -8,7 +8,13 @@ from pydantic import ValidationError
 
 import repo
 from auth import bearer_claims, create_access_token
-from models import EngineerCreateRequest, LoginRequest, RegisterRequest, UserPublic
+from models import (
+    EngineerCreateRequest,
+    EngineerUpdate,
+    LoginRequest,
+    RegisterRequest,
+    UserPublic,
+)
 from security import hash_password, verify_password
 
 logger = logging.getLogger()
@@ -61,8 +67,9 @@ def login(event):
     if error:
         return error
     row = repo.find_by_email(req.email)
-    # Same response for unknown email and wrong password — don't leak which accounts exist.
-    if not row or not verify_password(req.password, row[-1]):
+    # Same response for unknown email, wrong password and a deactivated account —
+    # don't leak which accounts exist, or which ones used to.
+    if not row or not row[4] or not verify_password(req.password, row[-1]):
         return respond(401, {"error": "invalid email or password"})
     user = public_user(row[:-1])
     token = create_access_token({"sub": str(user["id"]), "role": user["role"]})
@@ -71,7 +78,8 @@ def login(event):
 
 def me(claims):
     row = repo.find_by_id(int(claims["sub"]))
-    if not row:
+    # A token outlives a deactivation by up to 8 hours, so re-check here.
+    if not row or not row[4]:
         return respond(401, {"error": "unknown user"})
     return respond(200, public_user(row))
 
@@ -89,6 +97,30 @@ def create_engineer(event):
     except psycopg.errors.CheckViolation:
         return respond(400, {"error": "email must be an @acme.inc address"})
     return respond(201, {"user": public_user(row)})
+
+
+def list_engineers():
+    return respond(200, {"engineers": [repo.engineer(r) for r in repo.list_engineers()]})
+
+
+def update_engineer(event, user_id):
+    req, error = parse(event, EngineerUpdate)
+    if error:
+        return error
+    # exclude_unset keeps "phone": null (clear it) apart from an omitted phone.
+    fields = req.model_dump(exclude_unset=True)
+    if not fields:
+        return respond(400, {"error": "nothing to update"})
+    row = repo.update_engineer(user_id, fields)
+    if not row:
+        return respond(404, {"error": "engineer not found"})
+    return respond(200, {"engineer": repo.engineer(row)})
+
+
+def delete_engineer(user_id):
+    if not repo.deactivate_engineer(user_id):
+        return respond(404, {"error": "engineer not found"})
+    return respond(200, {"deleted": user_id})
 
 
 def handler(event=None, context=None):
@@ -111,10 +143,21 @@ def handler(event=None, context=None):
 
         if (method, path) == ("GET", "/me"):
             return me(claims)
-        if (method, path) == ("POST", "/engineers"):
+
+        segments = path.strip("/").split("/")
+        if segments[0] == "engineers":
             if claims.get("role") != ADMIN_ROLE:
                 return respond(403, {"error": "admin only"})
-            return create_engineer(event)
+            if len(segments) == 1:
+                if method == "POST":
+                    return create_engineer(event)
+                if method == "GET":
+                    return list_engineers()
+            if len(segments) == 2 and segments[1].isdigit():
+                if method == "PATCH":
+                    return update_engineer(event, int(segments[1]))
+                if method == "DELETE":
+                    return delete_engineer(int(segments[1]))
 
         return respond(404, {"error": f"no route for {method} {path}"})
     except Exception as exc:  # noqa: BLE001 — never leak a stack trace to the client

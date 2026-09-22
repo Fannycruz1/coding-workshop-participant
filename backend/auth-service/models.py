@@ -33,6 +33,13 @@ class EngineerCreateRequest(BaseModel):
     phone: str | None = None
 
 
+class EngineerUpdate(BaseModel):
+    """PATCH /engineers/{id}. Both optional; an empty body is a 400, not a no-op."""
+
+    specialty: Specialty | None = None
+    phone: str | None = None
+
+
 class UserPublic(BaseModel):
     """The users columns safe to return — no password, ever."""
 
