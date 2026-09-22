@@ -84,7 +84,7 @@ def list_incidents(event, claims):
     if error:
         return error
     rows = repo.list_incidents(claims.get("role"), int(claims["sub"]), filters)
-    return respond(200, {"incidents": [repo.incident(r) for r in rows]})
+    return respond(200, {"incidents": [repo.listed_incident(r) for r in rows]})
 
 
 def get_incident(incident_id, claims):
@@ -92,7 +92,7 @@ def get_incident(incident_id, claims):
     # Out of scope is a 404, not a 403: you should not learn it exists.
     if not row:
         return respond(404, {"error": "incident not found"})
-    return respond(200, {"incident": repo.incident(row)})
+    return respond(200, {"incident": repo.listed_incident(row)})
 
 
 def delete_incident(incident_id):
@@ -220,7 +220,7 @@ def route(method, segments, event, claims):
             row = repo.find_incident(incident_id)
             if not row:
                 return respond(404, {"error": "incident not found"})
-            incident = repo.incident(row)
+            incident = repo.listed_incident(row)
             caller = int(claims["sub"])
             is_reporter = incident["created_by"] == caller
             is_assignee = incident["assigned_to"] == caller
@@ -234,6 +234,13 @@ def route(method, segments, event, claims):
                 if not (is_admin or role == ENGINEER_ROLE):
                     return respond(403, {"error": "only an engineer or an admin"})
                 return assign_incident(event, incident, claims)
+
+            if segments[2] == "notes" and method == "GET":
+                # Readable by anyone the incident itself is visible to, so the
+                # same out-of-scope 404 as GET /incidents/{id}.
+                if not repo.find_visible_incident(incident_id, role, caller):
+                    return respond(404, {"error": "incident not found"})
+                return respond(200, {"notes": repo.list_notes(incident_id)})
 
             if segments[2] == "notes" and method == "POST":
                 if not (is_admin or is_reporter or is_assignee):

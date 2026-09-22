@@ -14,6 +14,23 @@ ESCALATION_COLUMNS = (
 )
 ESCALATION_FIELDS = tuple(c.strip() for c in ESCALATION_COLUMNS.split(","))
 
+# The read paths join the two user names on, because the client only has ids
+# and there is no route that turns an employee id into a name. The write paths
+# keep RETURNING the plain row — a UPDATE cannot join, and every caller
+# reloads the list after a write anyway.
+READ_COLUMNS = (
+    ", ".join(f"i.{c}" for c in INCIDENT_FIELDS)
+    + ", r.full_name, a.full_name"
+)
+READ_JOINS = (
+    " FROM incidents i"
+    " LEFT JOIN users r ON r.id = i.created_by"
+    " LEFT JOIN users a ON a.id = i.assigned_to"
+)
+READ_FIELDS = INCIDENT_FIELDS + ("reporter_name", "assignee_name")
+
+NOTE_FIELDS = ("id", "incident_id", "author_id", "author_name", "body", "created_at")
+
 
 def _row_to_dict(row, fields):
     return dict(zip(fields, row)) if row else None
@@ -21,6 +38,11 @@ def _row_to_dict(row, fields):
 
 def incident(row):
     return _row_to_dict(row, INCIDENT_FIELDS)
+
+
+def listed_incident(row):
+    """A row from one of the READ_COLUMNS queries — the same fields plus names."""
+    return _row_to_dict(row, READ_FIELDS)
 
 
 def escalation(row):
@@ -69,8 +91,8 @@ def list_incidents(role, user_id, filters):
 
     with connect() as conn:
         return conn.execute(
-            f"SELECT {INCIDENT_COLUMNS} FROM incidents"
-            f" WHERE {' AND '.join(clauses)} ORDER BY id DESC",
+            f"SELECT {READ_COLUMNS}{READ_JOINS}"
+            f" WHERE {' AND '.join(clauses)} ORDER BY i.id DESC",
             params,
         ).fetchall()
 
@@ -79,7 +101,7 @@ def find_incident(incident_id):
     """Unscoped — callers apply the permission rule themselves."""
     with connect() as conn:
         return conn.execute(
-            f"SELECT {INCIDENT_COLUMNS} FROM incidents WHERE id = %s", (incident_id,)
+            f"SELECT {READ_COLUMNS}{READ_JOINS} WHERE i.id = %s", (incident_id,)
         ).fetchone()
 
 
@@ -87,7 +109,7 @@ def find_visible_incident(incident_id, role, user_id):
     where, params = _scope_clause(role, user_id)
     with connect() as conn:
         return conn.execute(
-            f"SELECT {INCIDENT_COLUMNS} FROM incidents WHERE id = %s AND {where}",
+            f"SELECT {READ_COLUMNS}{READ_JOINS} WHERE i.id = %s AND {where}",
             [incident_id, *params],
         ).fetchone()
 
@@ -138,6 +160,18 @@ def assign(incident_id, engineer_id):
 
 
 # --- notes ----------------------------------------------------------------
+
+def list_notes(incident_id):
+    """Oldest first: a note thread reads top to bottom."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT n.id, n.incident_id, n.author_id, u.full_name, n.body, n.created_at"
+            " FROM incident_notes n JOIN users u ON u.id = n.author_id"
+            " WHERE n.incident_id = %s ORDER BY n.id",
+            (incident_id,),
+        ).fetchall()
+    return [dict(zip(NOTE_FIELDS, r)) for r in rows]
+
 
 def add_note(incident_id, author_id, body):
     with connect() as conn:

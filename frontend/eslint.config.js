@@ -26,4 +26,10 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // A test's probe component exists to hand the hook's value to the test —
+    // assigning it during render is the point, not a side effect to fix.
+    files: ['**/*.test.{js,jsx}'],
+    rules: { 'react-hooks/globals': 'off' },
+  },
 ])

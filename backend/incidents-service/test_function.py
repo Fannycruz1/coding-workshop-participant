@@ -139,6 +139,19 @@ def test_assigning_a_non_engineer_is_400(admin, employee, make_incident):
     assert status == 400
 
 
+def test_reads_carry_reporter_and_assignee_names(engineer, employee, make_incident):
+    """The API returns ids; a dashboard needs names, and only the DB has them."""
+    incident = make_incident()
+    _, payload = call("GET", f"/incidents/{incident['id']}", token=employee)
+    assert payload["incident"]["reporter_name"] == "Alex Johnson"
+    assert payload["incident"]["assignee_name"] is None
+
+    call("POST", f"/incidents/{incident['id']}/assign", token=engineer)
+    _, listed = call("GET", "/incidents", token=engineer)
+    mine = next(i for i in listed["incidents"] if i["id"] == incident["id"])
+    assert mine["assignee_name"] == "Sofia Reyes"
+
+
 # --- notes ----------------------------------------------------------------
 
 def test_reporter_adds_note(employee, make_incident):
@@ -213,6 +226,31 @@ def test_empty_note_is_400(employee, make_incident):
     incident = make_incident()
     status, _ = call("POST", f"/incidents/{incident['id']}/notes", {"body": ""}, token=employee)
     assert status == 400
+
+
+def test_reads_notes_oldest_first_with_author_names(employee, engineer, make_incident):
+    incident = make_incident()
+    call("POST", f"/incidents/{incident['id']}/assign", token=engineer)
+    call("POST", f"/incidents/{incident['id']}/notes", {"body": "any update?"}, token=employee)
+    call("POST", f"/incidents/{incident['id']}/notes", {"body": "on my way"}, token=engineer)
+
+    status, payload = call("GET", f"/incidents/{incident['id']}/notes", token=employee)
+    assert status == 200, payload
+    assert [n["body"] for n in payload["notes"]] == ["any update?", "on my way"]
+    assert payload["notes"][1]["author_name"] == "Sofia Reyes"
+
+
+def test_unrelated_employee_cannot_read_notes(other_employee, make_incident):
+    """Same rule as GET /incidents/{id}: out of scope is a 404, not a 403."""
+    incident = make_incident()
+    status, _ = call("GET", f"/incidents/{incident['id']}/notes", token=other_employee)
+    assert status == 404
+
+
+def test_reading_notes_requires_login(make_incident):
+    incident = make_incident()
+    status, _ = call("GET", f"/incidents/{incident['id']}/notes")
+    assert status == 401
 
 
 # --- delete ---------------------------------------------------------------

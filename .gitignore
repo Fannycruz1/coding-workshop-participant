@@ -271,3 +271,6 @@ backend/*/psycopg*/
 backend/*/pydantic*/
 backend/*/typing_extensions.py
 backend/*/typing_inspection/
+
+# lib/ above is meant for build output; the frontend keeps source there.
+!frontend/src/lib/

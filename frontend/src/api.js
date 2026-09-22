@@ -1,3 +1,7 @@
+import { useCallback } from 'react'
+
+import { useAuth } from './useAuth'
+
 // Every call goes through bin/proxy-server.js, which maps /api/<service>/<route>
 // onto that service's Lambda Function URL. VITE_API_URL is written by
 // bin/generate-env.sh; the default matches the proxy's hardcoded port.
@@ -18,4 +22,10 @@ export async function apiFetch(path, { token, body, ...options } = {}) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `request failed (${response.status})`)
   return data
+}
+
+/** apiFetch with the logged-in token already attached — every dashboard call needs it. */
+export function useApi() {
+  const { token } = useAuth()
+  return useCallback((path, options) => apiFetch(path, { ...options, token }), [token])
 }

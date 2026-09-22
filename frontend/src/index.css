@@ -1,68 +1,163 @@
+/* One stylesheet, no component library: three dashboards of forms and lists
+   is not enough surface to earn MUI's weight. Layout is CSS grid and one
+   media query, which is also why there is no react-responsive. */
 :root {
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #1d4ed8;
+  --danger: #b91c1c;
+
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  color: var(--ink);
+  background: var(--bg);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+* { box-sizing: border-box; }
+
+body { margin: 0; }
+
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
 }
 
-body {
-  margin: 0;
+main.narrow { max-width: 26rem; }
+
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; margin: 0; }
+
+a { color: var(--accent); }
+
+nav {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+nav .brand { font-weight: 600; text-decoration: none; }
+nav .who { color: var(--muted); margin-left: auto; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+  color: inherit;
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+  padding: 0.45rem 0.9rem;
+  margin-top: 0.5rem;
+  margin-right: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font: inherit;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+button:hover { border-color: var(--accent); }
+button.danger { color: var(--danger); }
+button.active { background: var(--accent); color: #fff; }
+
+/* Stacks on a phone, side by side from tablet up — the whole of the
+   "responsive" requirement, in two rules. */
+.row, .filters, .inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.row > *, .filters > * { flex: 1; }
+
+@media (min-width: 40rem) {
+  .row, .filters, .inline {
+    flex-direction: row;
+    align-items: flex-end;
+    flex-wrap: wrap;
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+}
+
+.incident header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  margin-right: 0.3rem;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.meta dt { font-size: 0.75rem; color: var(--muted); }
+.meta dd { margin: 0; }
+
+.notes { border-top: 1px solid var(--line); margin-top: 0.75rem; padding-top: 0.5rem; }
+.notes h4 { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.notes ul, .rows { list-style: none; padding: 0; margin: 0; }
+.notes li { border-left: 2px solid var(--line); padding-left: 0.6rem; margin-bottom: 0.5rem; }
+.notes time { color: var(--muted); font-size: 0.75rem; margin-left: 0.5rem; }
+.notes p { margin: 0.2rem 0; }
+.notes form { display: flex; gap: 0.5rem; align-items: center; }
+
+.rows li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs { display: flex; flex-wrap: wrap; }
+
+.muted { color: var(--muted); }
+
+[role="alert"] { color: var(--danger); }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
