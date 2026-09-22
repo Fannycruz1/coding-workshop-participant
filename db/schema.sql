@@ -27,7 +27,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR UNIQUE NOT NULL CHECK (email ILIKE '%@acme.inc'),
-    password VARCHAR NOT NULL, -- plain text for now; temporary for local development
+    password VARCHAR NOT NULL, -- bcrypt hash
     full_name VARCHAR NOT NULL,
     role user_role NOT NULL,
     is_active BOOLEAN DEFAULT true,
@@ -108,11 +108,16 @@ CREATE TABLE IF NOT EXISTS escalation_requests (
     current_priority incident_priority NOT NULL,
     requested_priority incident_priority NOT NULL,
     reason TEXT NOT NULL,
+    CHECK (requested_priority > current_priority),
     status escalation_status NOT NULL DEFAULT 'Pending',
     decided_by INT NULL REFERENCES users(id),
     decided_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- At most one open escalation request per incident.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_escalation_one_pending
+    ON escalation_requests(incident_id) WHERE status = 'Pending';
 
 CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
 CREATE INDEX IF NOT EXISTS idx_incidents_priority ON incidents(priority);

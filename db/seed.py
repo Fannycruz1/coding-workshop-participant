@@ -3,13 +3,17 @@
 import random
 from datetime import timedelta
 
+import bcrypt
+
 from db import connect
 
-random.seed(42)  # ponytail: fixed seed for reproducible demo data, drop if variety is wanted
+random.seed(42)  
 
 NOW = None  # set in main() to the DB's current timestamp
 
 DEMO_PASSWORD = "Password123!"
+# Hashed once: every demo user shares the same password.
+DEMO_PASSWORD_HASH = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode()
 
 ADMIN_NAMES = ["Priya Natarajan", "Marcus DeLuca"]
 
@@ -137,7 +141,7 @@ def seed_users(cur):
     for name, email in zip(ADMIN_NAMES, admin_emails):
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'facility_admin') RETURNING id",
-            (email, DEMO_PASSWORD, name),
+            (email, DEMO_PASSWORD_HASH, name),
         )
         users[name] = cur.fetchone()[0]
 
@@ -145,7 +149,7 @@ def seed_users(cur):
     for name, specialty in ENGINEERS:
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'engineer') RETURNING id",
-            (email_for(name), DEMO_PASSWORD, name),
+            (email_for(name), DEMO_PASSWORD_HASH, name),
         )
         uid = cur.fetchone()[0]
         users[name] = uid
@@ -160,7 +164,7 @@ def seed_users(cur):
     for name, email in zip(EMPLOYEE_NAMES, employee_emails):
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'employee') RETURNING id",
-            (email, DEMO_PASSWORD, name),
+            (email, DEMO_PASSWORD_HASH, name),
         )
         uid = cur.fetchone()[0]
         users[name] = uid
@@ -312,7 +316,10 @@ def seed_notes(cur, incidents):
 
 
 def seed_escalations(cur, incidents, admin_ids):
-    candidates_up = [i for i in incidents if i["priority"] != "Critical"]
+    # Only the assigned engineer may request an escalation, so skip unassigned incidents.
+    candidates_up = [
+        i for i in incidents if i["priority"] != "Critical" and i["assigned_to"]
+    ]
     random.shuffle(candidates_up)
     n = min(10, len(candidates_up))
     chosen = candidates_up[:n]
@@ -342,7 +349,7 @@ def seed_escalations(cur, incidents, admin_ids):
                (incident_id, requested_by, current_priority, requested_priority, reason, status,
                 decided_by, decided_at, created_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (inc["id"], inc["creator"], current_priority, requested_priority,
+            (inc["id"], inc["assigned_to"], current_priority, requested_priority,
              "Impact has grown; requesting a higher priority to get faster attention.",
              status, decided_by, decided_at, requested_at),
         )
