@@ -339,7 +339,9 @@ for req in "$PROJECT_ROOT"/backend/*/requirements.txt; do
         continue
     fi
     echo -e "  Installing pip requirements for $(basename "$svc_dir")..."
-    pip install --quiet --target="$svc_dir" -r "$req" 2>/dev/null || true
+    # python -m pip, not pip: a bare `pip` can belong to a different interpreter
+    # than `python`, and compiled wheels then get the wrong ABI for the Lambda.
+    python -m pip install --quiet --target="$svc_dir" -r "$req" 2>/dev/null || true
     echo "$REQS_HASH" > "$HASH_FILE"
 done
 
