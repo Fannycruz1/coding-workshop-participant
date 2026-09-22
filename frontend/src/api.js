@@ -3,9 +3,13 @@ import { useCallback } from 'react'
 import { useAuth } from './useAuth'
 
 // Every call goes through bin/proxy-server.js, which maps /api/<service>/<route>
-// onto that service's Lambda Function URL. VITE_API_URL is written by
-// bin/generate-env.sh; the default matches the proxy's hardcoded port.
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// onto that service's Lambda Function URL.
+//
+// In dev we go through Vite's own proxy (see vite.config.js) rather than
+// VITE_API_URL: that value is "http://localhost:3001", which is only correct
+// for a browser running on this machine. A built bundle has no dev server, so
+// it uses VITE_API_URL as bin/generate-env.sh wrote it.
+const BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '')
 
 /** Calls the backend and unwraps JSON. Non-2xx throws the API's own error message. */
 export async function apiFetch(path, { token, body, ...options } = {}) {

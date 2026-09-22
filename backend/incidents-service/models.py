@@ -26,6 +26,10 @@ class IncidentCreate(BaseModel):
 class IncidentFilters(BaseModel):
     """GET /incidents query params. Unknown enum values come back as a 400."""
 
+    # Capped by default: the list feeds a dashboard that renders every row it
+    # is handed, and the seed alone holds hundreds. Narrow with the filters.
+    limit: int = Field(default=50, ge=1, le=200)
+
     status: Status | None = None
     category: Category | None = None
     priority: Priority | None = None

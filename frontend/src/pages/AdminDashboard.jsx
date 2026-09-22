@@ -6,7 +6,7 @@ import { toQuery } from '../lib/incident-fields'
 import IncidentNotes from '../components/IncidentNotes'
 import { useApi } from '../api'
 import { useFacilities, useIncidents } from '../lib/data'
-import { CATEGORIES } from '../lib/constants'
+import { CATEGORIES, PAGE_SIZE } from '../lib/constants'
 
 const NO_FILTERS = { status: '', category: '', priority: '', q: '' }
 const TABS = ['Incidents', 'Escalations', 'Facilities', 'Engineers']
@@ -26,7 +26,7 @@ function useEngineers() {
 function Incidents({ facilities, engineers }) {
   const api = useApi()
   const [filters, setFilters] = useState(NO_FILTERS)
-  const query = useMemo(() => toQuery(filters), [filters])
+  const query = useMemo(() => toQuery({ ...filters, limit: PAGE_SIZE }), [filters])
   const { incidents, error, reload } = useIncidents(query)
   const [actionError, setActionError] = useState(null)
 
@@ -45,6 +45,9 @@ function Incidents({ facilities, engineers }) {
       <IncidentFilters value={filters} onChange={setFilters} />
       {(error || actionError) && <p role="alert">{error || actionError}</p>}
       {incidents.length === 0 && <p className="muted">No incidents match.</p>}
+      {incidents.length === PAGE_SIZE && (
+        <p className="muted">Showing the newest {PAGE_SIZE}. Narrow with the filters above.</p>
+      )}
 
       {incidents.map((incident) => (
         <IncidentCard key={incident.id} incident={incident} names={facilities.names}>

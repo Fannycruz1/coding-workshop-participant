@@ -152,6 +152,32 @@ def test_reads_carry_reporter_and_assignee_names(engineer, employee, make_incide
     assert mine["assignee_name"] == "Sofia Reyes"
 
 
+# --- limit ----------------------------------------------------------------
+
+def test_list_is_capped_by_default(admin):
+    """The seed alone holds hundreds. An uncapped list is a dashboard that
+    renders every row it is given — see docs/build-notes.md, Phase 6."""
+    _, payload = call("GET", "/incidents", token=admin)
+    assert len(payload["incidents"]) == 50
+
+
+def test_limit_can_be_lowered(admin):
+    _, payload = call("GET", "/incidents", query={"limit": "5"}, token=admin)
+    assert len(payload["incidents"]) == 5
+
+
+def test_limit_is_bounded(admin):
+    for bad in ("0", "-1", "1000", "all"):
+        status, _ = call("GET", "/incidents", query={"limit": bad}, token=admin)
+        assert status == 400, bad
+
+
+def test_limit_keeps_the_newest(admin):
+    _, capped = call("GET", "/incidents", query={"limit": "3"}, token=admin)
+    ids = [i["id"] for i in capped["incidents"]]
+    assert ids == sorted(ids, reverse=True)
+
+
 # --- notes ----------------------------------------------------------------
 
 def test_reporter_adds_note(employee, make_incident):

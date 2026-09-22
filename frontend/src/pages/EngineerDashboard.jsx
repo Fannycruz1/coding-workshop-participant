@@ -6,7 +6,7 @@ import { toQuery } from '../lib/incident-fields'
 import IncidentNotes from '../components/IncidentNotes'
 import { useApi } from '../api'
 import { useFacilities, useIncidents } from '../lib/data'
-import { TRANSITIONS } from '../lib/constants'
+import { PAGE_SIZE, TRANSITIONS } from '../lib/constants'
 import { useAuth } from '../useAuth'
 
 const NO_FILTERS = { status: '', category: '', priority: '', q: '' }
@@ -15,7 +15,7 @@ export default function EngineerDashboard() {
   const api = useApi()
   const { user } = useAuth()
   const [filters, setFilters] = useState(NO_FILTERS)
-  const query = useMemo(() => toQuery(filters), [filters])
+  const query = useMemo(() => toQuery({ ...filters, limit: PAGE_SIZE }), [filters])
   // The backend scopes this to my queue plus the unclaimed pool.
   const { incidents, error, reload } = useIncidents(query)
   const facilities = useFacilities()
@@ -46,6 +46,9 @@ export default function EngineerDashboard() {
       <IncidentFilters value={filters} onChange={setFilters} />
       {(error || actionError) && <p role="alert">{error || actionError}</p>}
       {incidents.length === 0 && <p className="muted">Nothing assigned or waiting.</p>}
+      {incidents.length === PAGE_SIZE && (
+        <p className="muted">Showing the newest {PAGE_SIZE}. Narrow with the filters above.</p>
+      )}
 
       {incidents.map((incident) => {
         const mine = incident.assigned_to === user.id

@@ -7,7 +7,7 @@ import IncidentForm from '../components/IncidentForm'
 import IncidentNotes from '../components/IncidentNotes'
 import { useApi } from '../api'
 import { useFacilities, useIncidents } from '../lib/data'
-import { PRIORITIES } from '../lib/constants'
+import { PAGE_SIZE, PRIORITIES } from '../lib/constants'
 
 const NO_FILTERS = { status: '', category: '', priority: '', q: '' }
 
@@ -57,7 +57,7 @@ function Escalate({ incident, onDone }) {
 export default function EmployeeDashboard() {
   const api = useApi()
   const [filters, setFilters] = useState(NO_FILTERS)
-  const query = useMemo(() => toQuery(filters), [filters])
+  const query = useMemo(() => toQuery({ ...filters, limit: PAGE_SIZE }), [filters])
   const { incidents, error, reload } = useIncidents(query)
   const facilities = useFacilities()
   const [busy, setBusy] = useState(false)
@@ -92,6 +92,9 @@ export default function EmployeeDashboard() {
       <IncidentFilters value={filters} onChange={setFilters} />
       {error && <p role="alert">{error}</p>}
       {incidents.length === 0 && <p className="muted">Nothing here yet.</p>}
+      {incidents.length === PAGE_SIZE && (
+        <p className="muted">Showing the newest {PAGE_SIZE}. Narrow with the filters above.</p>
+      )}
 
       {incidents.map((incident) => (
         <IncidentCard key={incident.id} incident={incident} names={facilities.names}>

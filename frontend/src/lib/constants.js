@@ -6,6 +6,9 @@ export const CATEGORIES = [
   'AV/Conference Room', 'Printer', 'Access/Badge', 'Cleaning', 'Other',
 ]
 
+// Matches IncidentFilters.limit's default in the incidents service.
+export const PAGE_SIZE = 50
+
 export const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 
 export const STATUSES = ['Open', 'In Progress', 'Blocked', 'Resolved', 'Closed']

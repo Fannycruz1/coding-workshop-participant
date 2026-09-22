@@ -13,7 +13,6 @@ export default function NoteList({ notes, onAdd }) {
 
   return (
     <section className="notes">
-      <h4>Notes</h4>
       {notes.length === 0 && <p className="muted">No notes yet.</p>}
       <ul>
         {notes.map((note) => (

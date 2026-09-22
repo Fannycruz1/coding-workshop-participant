@@ -92,8 +92,8 @@ def list_incidents(role, user_id, filters):
     with connect() as conn:
         return conn.execute(
             f"SELECT {READ_COLUMNS}{READ_JOINS}"
-            f" WHERE {' AND '.join(clauses)} ORDER BY i.id DESC",
-            params,
+            f" WHERE {' AND '.join(clauses)} ORDER BY i.id DESC LIMIT %s",
+            [*params, filters.limit],
         ).fetchall()
 
 
