@@ -72,6 +72,31 @@ will be deployed to a cloud environment and accessible via a web browser.
 Participants will also gain hands-on experience with modern web development
 technologies and best practices.
 
+## Database (ACME Facility Incident Management)
+
+Schema and seed data for the facility incident tracker live in [`db/`](./db).
+
+Setup:
+
+```sh
+cd db
+python3 -m pip install -r requirements.txt
+```
+
+Set `DATABASE_URL` in `db/.env` (defaults to `postgresql://postgres@localhost:5432/acme_incidents` if unset).
+
+Run:
+
+```sh
+make migrate   # creates the acme_incidents database (if missing) and applies db/schema.sql
+make seed      # truncates and reloads demo data (safe to re-run)
+make reset     # drop + migrate + seed
+```
+
+Seeding prints row counts per table and demo login credentials
+(`admin@acme.inc`, `employee@acme.inc`, `sofia.reyes@acme.inc`, all with
+password `Password123!`).
+
 ## Contributing
 
 See the [CONTRIBUTING](./CONTRIBUTING.md) resource for more details.
