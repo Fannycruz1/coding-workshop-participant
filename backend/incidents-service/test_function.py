@@ -154,9 +154,13 @@ def test_reads_carry_reporter_and_assignee_names(engineer, employee, make_incide
 
 # --- limit ----------------------------------------------------------------
 
-def test_list_is_capped_by_default(admin):
-    """The seed alone holds hundreds. An uncapped list is a dashboard that
-    renders every row it is given — see docs/build-notes.md, Phase 6."""
+def test_list_is_capped_by_default(admin, make_incident):
+    """An uncapped list is a dashboard that renders every row it is given —
+    see docs/build-notes.md, Phase 6. The seed is small, so top it up here."""
+    with connect() as conn:
+        existing = conn.execute("SELECT count(*) FROM incidents").fetchone()[0]
+    for _ in range(max(0, 51 - existing)):
+        make_incident()
     _, payload = call("GET", "/incidents", token=admin)
     assert len(payload["incidents"]) == 50
 

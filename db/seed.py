@@ -1,15 +1,10 @@
-"""Seed acme_incidents with realistic demo data. Safe to re-run (truncates first)."""
+"""Seed acme_incidents with a small, hand-written demo dataset. Safe to re-run (truncates first)."""
 
-import random
 from datetime import timedelta
 
 import bcrypt
 
 from db import connect
-
-random.seed(42)  
-
-NOW = None  # set in main() to the DB's current timestamp
 
 DEMO_PASSWORD = "Password123!"
 # Hashed once: every demo user shares the same password.
@@ -18,115 +13,177 @@ DEMO_PASSWORD_HASH = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).dec
 ADMIN_NAMES = ["Priya Natarajan", "Marcus DeLuca"]
 
 ENGINEERS = [
-    ("Sofia Reyes", "HVAC"),
-    ("James Okafor", "Electrical"),
-    ("Wei Zhang", "Network"),
-    ("Fatima Haddad", "Plumbing"),
-    ("Liam O'Connor", "AV/Conference Room"),
-    ("Grace Kim", "Furniture"),
+    ("Sofia Reyes", "HVAC", "555-0142"),
+    ("James Okafor", "Electrical", "555-0118"),
+    ("Wei Zhang", "Network", "555-0173"),
+    ("Fatima Haddad", "Plumbing", "555-0129"),
 ]
 
-EMPLOYEE_NAMES = [
-    "Alex Johnson", "Maria Garcia", "David Chen", "Sarah Williams",
-    "Ahmed Hassan", "Emily Nguyen", "Carlos Mendoza", "Julia Novak",
-    "Ravi Patel", "Hannah Cohen", "Tomas Silva", "Nadia Petrova",
-]
+EMPLOYEE_NAMES = ["Alex Johnson", "Maria Garcia", "David Chen", "Sarah Williams"]
 
 BUILDINGS = [
-    ("Riverside Tower", "500 Riverside Ave, Austin, TX"),
-    ("Innovation Campus", "1200 Innovation Way, Denver, CO"),
-    ("Harbor Point", "88 Harbor Point Blvd, Boston, MA"),
+    ("Riverside Tower", "500 Riverside Ave, Austin, TX", 3),
+    ("Harbor Point", "88 Harbor Point Blvd, Boston, MA", 2),
+]
+SEATS_PER_FLOOR = 3
+
+# Hours after creation for each transition, unless an incident overrides them.
+BEATS = {"start": 6, "block": 12, "unblock": 30, "resolve": 36, "close": 60}
+
+INCIDENTS = [
+    dict(
+        title="Server room AC failed, room at 91F and climbing",
+        description=(
+            "The CRAC unit in the floor 3 server room tripped off around 02:00 and never restarted. "
+            "Rack inlet temps are at 91F and two switches have already thermal-throttled. "
+            "We have portable fans in there but the door has to stay propped open."
+        ),
+        category="HVAC", priority="Critical", status="Blocked",
+        building="Riverside Tower", floor=3, seat=None,
+        reporter="Maria Garcia", engineer="Sofia Reyes", days_ago=4,
+        beats={"start": 1, "block": 5},
+        block_reason="Compressor is shot. Replacement unit is with the vendor, earliest delivery is Thursday.",
+        notes=[
+            (2, "engineer", "On site. Compressor won't spin up, running on portable cooling for now."),
+            (6, "employee", "Confirmed the racks are holding around 84F with the fans running."),
+            (26, "engineer", "Vendor quoted Thursday for the replacement compressor. Keeping the portables in place until then."),
+        ],
+    ),
+    dict(
+        title="Breaker trip killed power to the floor 2 east desks",
+        description=(
+            "A breaker tripped just after 09:00 and about a dozen desks along the east wall lost power. "
+            "Resetting it holds for a few minutes, then it trips again. Lights are fine, only the floor outlets are out."
+        ),
+        category="Electrical", priority="High", status="In Progress",
+        building="Riverside Tower", floor=2, seat="2A-01",
+        reporter="Alex Johnson", engineer="James Okafor", days_ago=2,
+        notes=[
+            (3, "engineer", "Traced it to the east outlet circuit. Something on it is pulling too much, isolating desk by desk."),
+            (9, "employee", "We've moved everyone to the west side in the meantime."),
+        ],
+    ),
+    dict(
+        title="Wi-Fi drops every few minutes on floor 1",
+        description=(
+            "Since Monday, anyone on floor 1 gets dropped off the wifi roughly every five minutes. "
+            "Reconnecting works but video calls don't survive it. Wired desks are unaffected."
+        ),
+        category="Network", priority="High", status="Open",
+        building="Harbor Point", floor=1, seat=None,
+        reporter="David Chen", engineer="Wei Zhang", days_ago=1,
+        notes=[(4, "employee", "Happening to at least six of us, all on floor 1.")],
+    ),
+    dict(
+        title="Kitchen sink leaking onto the floor",
+        description=(
+            "The floor 2 kitchen sink drips steadily from the base of the faucet and has soaked the cabinet below. "
+            "Someone put a towel down but it needs wringing out twice a day."
+        ),
+        category="Plumbing", priority="Medium", status="Resolved",
+        building="Riverside Tower", floor=2, seat=None,
+        reporter="Sarah Williams", engineer="Fatima Haddad", days_ago=11,
+        notes=[
+            (8, "engineer", "Supply line fitting was loose and the washer had perished. Replaced both."),
+            (40, "employee", "Dry this morning, thanks."),
+        ],
+    ),
+    dict(
+        title="Office chair at 1A-02 has a cracked base",
+        description="The five-star base on the chair at 1A-02 is cracked and the seat leans hard to the left. Not safe to sit on.",
+        category="Furniture", priority="Low", status="Closed",
+        building="Riverside Tower", floor=1, seat="1A-02",
+        reporter="Alex Johnson", engineer=None, days_ago=24,
+        notes=[(50, "employee", "New chair arrived, old one tagged for disposal.")],
+    ),
+    dict(
+        title="Projector in the floor 3 conference room won't power on",
+        description=(
+            "No response from the projector in the floor 3 conference room, not from the remote and not from the wall panel. "
+            "No standby light on the unit at all. Meetings are being moved to Harbor Point."
+        ),
+        category="AV/Conference Room", priority="Medium", status="In Progress",
+        building="Riverside Tower", floor=3, seat=None,
+        reporter="Maria Garcia", engineer="Wei Zhang", days_ago=5,
+        notes=[(20, "engineer", "Ceiling outlet is dead, not the projector. Looping in electrical.")],
+    ),
+    dict(
+        title="Floor 1 printer jams on every duplex job",
+        description=(
+            "The shared printer by the floor 1 copy room jams part way through anything double-sided. "
+            "Single-sided printing is fine. Clearing the jam takes about ten minutes each time."
+        ),
+        category="Printer", priority="Low", status="Open",
+        building="Harbor Point", floor=1, seat=None,
+        reporter="David Chen", engineer=None, days_ago=6,
+        notes=[],
+    ),
+    dict(
+        title="Badge reader at the east entrance stopped reading cards",
+        description=(
+            "The east entrance reader at Harbor Point gives a red light for every badge. "
+            "People are walking round to the main lobby, which adds a few minutes each morning."
+        ),
+        category="Access/Badge", priority="High", status="Resolved",
+        building="Harbor Point", floor=1, seat=None,
+        reporter="Sarah Williams", engineer="James Okafor", days_ago=9,
+        notes=[
+            (5, "engineer", "Reader had dropped off the access controller. Reseated the network drop and re-enrolled it."),
+            (38, "employee", "Badged in there this morning without trouble."),
+        ],
+    ),
+    dict(
+        title="Coffee spill left on the floor 2 kitchen floor",
+        description="Someone dropped a full carafe in the floor 2 kitchen. Sticky patch about a metre across, near the fridge.",
+        category="Cleaning", priority="Low", status="Closed",
+        building="Harbor Point", floor=2, seat=None,
+        reporter="Maria Garcia", engineer=None, days_ago=16,
+        beats={"resolve": 5, "close": 20},
+        notes=[],
+    ),
+    dict(
+        title="Floor 1 runs warm all afternoon",
+        description=(
+            "From about 14:00 onwards floor 1 sits around 79F while the thermostat reads 72F. "
+            "It's been like this for a couple of weeks now."
+        ),
+        category="HVAC", priority="Medium", status="Open",
+        building="Riverside Tower", floor=1, seat=None,
+        reporter="Alex Johnson", engineer="Sofia Reyes", days_ago=3,
+        notes=[(10, "employee", "Worst by the south windows, cooler near the lifts.")],
+    ),
+    dict(
+        title="Access switch down, floor 2 wired desks offline",
+        description=(
+            "The floor 2 access switch at Harbor Point is unreachable and every wired desk on that floor is offline. "
+            "Wi-Fi is up, so people are working off that, but the desk phones are down too."
+        ),
+        category="Network", priority="Critical", status="In Progress",
+        building="Harbor Point", floor=2, seat="2A-03",
+        reporter="David Chen", engineer="Wei Zhang", days_ago=1,
+        beats={"start": 1},
+        notes=[(2, "engineer", "Switch is powered but not passing traffic. Swapping in a spare and restoring the config.")],
+    ),
+    dict(
+        title="Water cooler on floor 3 has been empty since Monday",
+        description="The floor 3 water cooler is out and there are no spare bottles in the store cupboard.",
+        category="Other", priority="Low", status="Blocked",
+        building="Riverside Tower", floor=3, seat=None,
+        reporter="Sarah Williams", engineer="Fatima Haddad", days_ago=7,
+        block_reason="Supplier missed the delivery slot; next scheduled drop is Monday.",
+        notes=[(30, "engineer", "Chased the supplier, they can't deliver before Monday.")],
+    ),
 ]
 
-FLOORS_PER_BUILDING = [4, 3, 5]
-WINGS = ["A", "B", "C"]
-
-# category -> list of (title_template, description_template); {floor}/{wing}/{seat}/{building} fillable
-INCIDENT_TEMPLATES = {
-    "HVAC": [
-        ("AC not cooling in conference room {wing}", "Temperature in the {wing} conference room on floor {floor} has been stuck above 78F all afternoon."),
-        ("Heating not working on floor {floor}", "Radiators on floor {floor} are cold; several employees are working in coats."),
-        ("Thermostat unresponsive near {seat}", "The wall thermostat near {seat} does not respond to any button presses."),
-    ],
-    "Electrical": [
-        ("Flickering lights on floor {floor}", "Overhead lights near wing {wing} flicker on and off intermittently."),
-        ("Outlet not working at {seat}", "The power outlet under the desk at {seat} has no power; monitor keeps shutting off."),
-        ("Breaker tripping in {wing} kitchen", "The breaker for the {wing} wing kitchen trips whenever the microwave and kettle run together."),
-    ],
-    "Plumbing": [
-        ("Leaking faucet in floor {floor} kitchen", "The kitchen sink faucet on floor {floor} is dripping steadily and pooling water on the counter."),
-        ("Clogged toilet in {wing} restroom", "One of the stalls in the {wing} wing restroom is clogged and won't flush."),
-        ("Low water pressure on floor {floor}", "Sinks on floor {floor} have very weak water pressure since this morning."),
-    ],
-    "Furniture": [
-        ("Broken chair at {seat}", "The office chair at {seat} has a cracked base and tilts to one side."),
-        ("Desk won't adjust at {seat}", "The standing desk at {seat} is stuck and won't raise or lower."),
-        ("Missing chair in conference room {wing}", "Conference room {wing} on floor {floor} is short two chairs."),
-    ],
-    "Network": [
-        ("Wi-Fi drops on floor {floor}", "Wi-Fi disconnects every few minutes for anyone working on floor {floor}."),
-        ("No ethernet connection at {seat}", "The wired connection at {seat} shows no link light and won't get an IP address."),
-        ("Slow network in {wing} wing", "File transfers and video calls are extremely slow throughout the {wing} wing."),
-    ],
-    "AV/Conference Room": [
-        ("Projector not turning on in room {wing}", "The projector in conference room {wing} on floor {floor} won't power on."),
-        ("Video call audio cutting out in {wing}", "Conference room {wing} audio cuts out a few minutes into every video call."),
-        ("HDMI input not detected in room {wing}", "The display in room {wing} doesn't detect any laptop plugged into the HDMI cable."),
-    ],
-    "Printer": [
-        ("Printer jammed on floor {floor}", "The shared printer on floor {floor} has a persistent paper jam."),
-        ("Printer out of toner near {wing} wing", "The printer near the {wing} wing is out of toner and needs a replacement cartridge."),
-        ("Print jobs not reaching printer on floor {floor}", "Jobs sent to the floor {floor} printer disappear from the queue without printing."),
-    ],
-    "Access/Badge": [
-        ("Badge reader offline at east entrance", "The badge reader at the east entrance of {building} isn't reading any cards."),
-        ("Badge not granting access to floor {floor}", "An employee's badge is being denied at the floor {floor} elevator lobby."),
-        ("Turnstile stuck at main entrance", "The turnstile at the {building} main entrance is jammed half-open."),
-    ],
-    "Cleaning": [
-        ("Trash not emptied on floor {floor}", "Bins near {seat} have not been emptied in several days."),
-        ("Spill in floor {floor} kitchen", "There's a sticky spill on the kitchen floor on {floor} that needs cleanup."),
-        ("Carpet stain near {wing} wing", "A large stain has appeared on the carpet near the {wing} wing entrance."),
-    ],
-    "Other": [
-        ("General maintenance request for floor {floor}", "Facilities noted a general upkeep item on floor {floor} that needs a look."),
-        ("Signage missing near {wing} wing", "The directional sign near the {wing} wing has fallen off the wall."),
-        ("Water cooler empty on floor {floor}", "The water cooler on floor {floor} has been empty since yesterday."),
-    ],
-}
-
-CATEGORIES = list(INCIDENT_TEMPLATES.keys())
-
-BLOCKED_REASONS = [
-    "Waiting on a replacement part from the vendor.",
-    "Needs building management approval before work can continue.",
-    "Escalated to an outside contractor; awaiting their schedule.",
-    "Parts on backorder, no estimated delivery date yet.",
-    "Requires after-hours access, waiting on security to schedule.",
+# (incident index, current, requested, status, reason)
+ESCALATIONS = [
+    (1, "Medium", "High", "Approved",
+     "Twelve desks have been without power for two days and the trips are getting more frequent."),
+    (5, "Medium", "High", "Pending",
+     "This is the only room that seats the whole team, and every meeting is being relocated."),
+    (11, "Low", "Medium", "Rejected",
+     "Nobody on floor 3 has drinking water without going down two floors."),
 ]
-
-NOTE_LINES_EMPLOYEE = [
-    "Any update on this? It's still an issue.",
-    "Thanks for looking into it.",
-    "This got worse overnight, just flagging.",
-    "Confirming this is still happening as of today.",
-    "Appreciate the quick response.",
-]
-
-NOTE_LINES_ENGINEER = [
-    "Took a look, working on a fix now.",
-    "Ordered the part, should be here in a few days.",
-    "Should be resolved, please confirm on your end.",
-    "Found the root cause, applying a fix.",
-    "Followed up with the vendor, waiting to hear back.",
-]
-
-PRIORITY_ORDER = ["Low", "Medium", "High", "Critical"]
-
-
-def priority_above(p, tiers=1):
-    idx = min(PRIORITY_ORDER.index(p) + tiers, len(PRIORITY_ORDER) - 1)
-    return PRIORITY_ORDER[idx]
 
 
 def email_for(full_name):
@@ -135,142 +192,97 @@ def email_for(full_name):
 
 
 def seed_users(cur):
-    users = {}  # full_name -> id
+    """Returns full_name -> user_id."""
+    users = {}
 
-    admin_emails = ["admin@acme.inc", email_for(ADMIN_NAMES[1])]
-    for name, email in zip(ADMIN_NAMES, admin_emails):
+    for i, name in enumerate(ADMIN_NAMES):
+        email = "admin@acme.inc" if i == 0 else email_for(name)
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'facility_admin') RETURNING id",
             (email, DEMO_PASSWORD_HASH, name),
         )
         users[name] = cur.fetchone()[0]
 
-    engineer_ids = {}  # specialty -> user_id
-    for name, specialty in ENGINEERS:
+    for name, specialty, phone in ENGINEERS:
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'engineer') RETURNING id",
             (email_for(name), DEMO_PASSWORD_HASH, name),
         )
-        uid = cur.fetchone()[0]
-        users[name] = uid
+        users[name] = cur.fetchone()[0]
         cur.execute(
             "INSERT INTO engineer_profiles (user_id, specialty, phone) VALUES (%s, %s, %s)",
-            (uid, specialty, f"555-01{random.randint(10, 99)}"),
+            (users[name], specialty, phone),
         )
-        engineer_ids[specialty] = uid
 
-    employee_emails = ["employee@acme.inc"] + [email_for(n) for n in EMPLOYEE_NAMES[1:]]
-    employee_ids = []
-    for name, email in zip(EMPLOYEE_NAMES, employee_emails):
+    for i, name in enumerate(EMPLOYEE_NAMES):
+        email = "employee@acme.inc" if i == 0 else email_for(name)
         cur.execute(
             "INSERT INTO users (email, password, full_name, role) VALUES (%s, %s, %s, 'employee') RETURNING id",
             (email, DEMO_PASSWORD_HASH, name),
         )
-        uid = cur.fetchone()[0]
-        users[name] = uid
-        employee_ids.append(uid)
+        users[name] = cur.fetchone()[0]
 
-    admin_ids = [users[n] for n in ADMIN_NAMES]
-    return admin_ids, engineer_ids, employee_ids
+    return users
 
 
 def seed_facilities(cur):
-    """Returns building_id -> [(floor_id, floor_number, [seat_ids...])]."""
+    """Returns (building name, floor number) -> (building_id, floor_id, {seat_code: seat_id})."""
     layout = {}
-    for (name, address), n_floors in zip(BUILDINGS, FLOORS_PER_BUILDING):
+    for name, address, n_floors in BUILDINGS:
         cur.execute(
             "INSERT INTO buildings (name, address) VALUES (%s, %s) RETURNING id", (name, address)
         )
         building_id = cur.fetchone()[0]
-        floors = []
         for floor_number in range(1, n_floors + 1):
             cur.execute(
                 "INSERT INTO floors (building_id, floor_number, name) VALUES (%s, %s, %s) RETURNING id",
                 (building_id, floor_number, f"Floor {floor_number}"),
             )
             floor_id = cur.fetchone()[0]
-            n_seats = random.randint(10, 20)
-            seat_ids = []
-            for i in range(1, n_seats + 1):
-                wing = WINGS[(i - 1) // 10 % len(WINGS)]
-                seat_code = f"{floor_number}{wing}-{i:03d}"
+            seats = {}
+            for i in range(1, SEATS_PER_FLOOR + 1):
+                seat_code = f"{floor_number}A-{i:02d}"
                 cur.execute(
                     "INSERT INTO seats (floor_id, seat_code) VALUES (%s, %s) RETURNING id",
                     (floor_id, seat_code),
                 )
-                seat_ids.append((cur.fetchone()[0], seat_code))
-            floors.append((floor_id, floor_number, seat_ids))
-        layout[building_id] = (name, floors)
+                seats[seat_code] = cur.fetchone()[0]
+            layout[(name, floor_number)] = (building_id, floor_id, seats)
     return layout
 
 
-STATUS_COUNTS = [("Open", 15), ("In Progress", 15), ("Blocked", 6), ("Resolved", 12), ("Closed", 12)]
-PRIORITY_POOL = ["Critical"] * 4 + ["High"] * 11 + ["Medium"] * 25 + ["Low"] * 20
+def status_history(spec, created_at, reporter_id, engineer_id, admin_id):
+    """(from, to, changed_by, at, reason) rows implied by the incident's final status."""
+    status = spec["status"]
+    beats = dict(BEATS, **spec.get("beats", {}))
+    at = lambda key: created_at + timedelta(hours=beats[key])
+    worker = engineer_id or admin_id
 
+    rows = [(None, "Open", reporter_id, created_at, None)]
+    if status == "Open":
+        return rows
 
-def seed_incidents(cur, admin_ids, engineer_ids, employee_ids, layout):
-    statuses = [s for s, n in STATUS_COUNTS for _ in range(n)]
-    priorities = PRIORITY_POOL[:]
-    random.shuffle(statuses)
-    random.shuffle(priorities)
-    building_ids = list(layout.keys())
-
-    incidents = []  # collected rows for later notes/escalations
-    for status, priority in zip(statuses, priorities):
-        category = random.choice(CATEGORIES)
-        building_id = random.choice(building_ids)
-        building_name, floors = layout[building_id]
-        floor_id, floor_number, seat_ids = random.choice(floors)
-        has_seat = random.random() < 0.7 and seat_ids
-        seat_id, seat_code = random.choice(seat_ids) if has_seat else (None, None)
-
-        title_tpl, desc_tpl = random.choice(INCIDENT_TEMPLATES[category])
-        fmt = dict(floor=floor_number, wing=random.choice(WINGS), seat=seat_code or "the shared area", building=building_name)
-        title = title_tpl.format(**fmt)
-        description = desc_tpl.format(**fmt)
-
-        creator = random.choice(employee_ids)
-
-        days_ago = random.uniform(10, 90) if status in ("Resolved", "Closed") else random.uniform(1, 60)
-        created_at = NOW - timedelta(days=days_ago)
-
-        engineer_id = engineer_ids.get(category, random.choice(list(engineer_ids.values())))
-        if status == "Open":
-            assigned_to = engineer_id if random.random() < 0.5 else None
-        else:
-            assigned_to = engineer_id
-
-        history = []  # (from_status, to_status, changed_by, changed_at, reason)
-        t = created_at
-        history.append((None, "Open", creator, t, None))
-
-        resolved_at = None
-        closed_at = None
-
-        if status != "Open":
-            t += timedelta(hours=random.uniform(2, 48))
-            changer = random.choice(admin_ids + [assigned_to])
-            history.append(("Open", "In Progress", changer, t, None))
-
-        if status == "Blocked":
-            t += timedelta(hours=random.uniform(2, 24))
-            history.append(("In Progress", "Blocked", assigned_to, t, random.choice(BLOCKED_REASONS)))
-
-        if status in ("Resolved", "Closed"):
-            if random.random() < 0.3:
-                t += timedelta(hours=random.uniform(2, 24))
-                history.append(("In Progress", "Blocked", assigned_to, t, random.choice(BLOCKED_REASONS)))
-                t += timedelta(hours=random.uniform(4, 48))
-                history.append(("Blocked", "In Progress", assigned_to, t, None))
-            t += timedelta(hours=random.uniform(4, 72))
-            history.append(("In Progress", "Resolved", assigned_to, t, None))
-            resolved_at = t
-
+    rows.append(("Open", "In Progress", worker, at("start"), None))
+    if status == "Blocked":
+        rows.append(("In Progress", "Blocked", worker, at("block"), spec["block_reason"]))
+    elif status in ("Resolved", "Closed"):
+        rows.append(("In Progress", "Resolved", worker, at("resolve"), None))
         if status == "Closed":
-            t += timedelta(hours=random.uniform(4, 72))
-            history.append(("Resolved", "Closed", creator, t, None))
-            closed_at = t
+            rows.append(("Resolved", "Closed", reporter_id, at("close"), None))
+    return rows
 
+
+def seed_incidents(cur, users, layout, now):
+    for spec in INCIDENTS:
+        building_id, floor_id, seats = layout[(spec["building"], spec["floor"])]
+        seat_id = seats[spec["seat"]] if spec["seat"] else None
+        reporter_id = users[spec["reporter"]]
+        engineer_id = users[spec["engineer"]] if spec["engineer"] else None
+        admin_id = users[ADMIN_NAMES[0]]
+
+        created_at = now - timedelta(days=spec["days_ago"])
+        history = status_history(spec, created_at, reporter_id, engineer_id, admin_id)
+        by_status = {to: at for _, to, _, at, _ in history}
         updated_at = history[-1][3]
 
         cur.execute(
@@ -278,80 +290,40 @@ def seed_incidents(cur, admin_ids, engineer_ids, employee_ids, layout):
                (title, description, category, status, priority, created_by, assigned_to,
                 building_id, floor_id, seat_id, created_at, updated_at, resolved_at, closed_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
-            (title, description, category, status, priority, creator, assigned_to,
-             building_id, floor_id, seat_id, created_at, updated_at, resolved_at, closed_at),
+            (spec["title"], spec["description"], spec["category"], spec["status"], spec["priority"],
+             reporter_id, engineer_id, building_id, floor_id, seat_id,
+             created_at, updated_at, by_status.get("Resolved"), by_status.get("Closed")),
         )
-        incident_id = cur.fetchone()[0]
+        spec["id"] = cur.fetchone()[0]
 
-        for from_status, to_status, changed_by, changed_at, reason in history:
-            cur.execute(
-                """INSERT INTO incident_status_history
-                   (incident_id, from_status, to_status, changed_by, reason, changed_at)
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (incident_id, from_status, to_status, changed_by, reason, changed_at),
-            )
+        cur.executemany(
+            """INSERT INTO incident_status_history
+               (incident_id, from_status, to_status, changed_by, reason, changed_at)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            [(spec["id"], f, t, by, reason, at) for f, t, by, at, reason in history],
+        )
 
-        incidents.append(dict(
-            id=incident_id, category=category, priority=priority, status=status,
-            creator=creator, assigned_to=assigned_to, created_at=created_at,
-            end_time=updated_at,
-        ))
-
-    return incidents
+        cur.executemany(
+            "INSERT INTO incident_notes (incident_id, author_id, body, created_at) VALUES (%s, %s, %s, %s)",
+            [(spec["id"], reporter_id if who == "employee" else engineer_id, body,
+              created_at + timedelta(hours=hours))
+             for hours, who, body in spec["notes"]],
+        )
 
 
-def seed_notes(cur, incidents):
-    for inc in incidents:
-        n_notes = random.randint(1, 5)
-        window = (inc["end_time"] - inc["created_at"]).total_seconds()
-        t = inc["created_at"]
-        for i in range(n_notes):
-            t = t + timedelta(seconds=window * random.uniform(0.05, 0.3)) if window > 0 else t + timedelta(hours=1)
-            author = inc["creator"] if i % 2 == 0 or not inc["assigned_to"] else inc["assigned_to"]
-            body = random.choice(NOTE_LINES_EMPLOYEE if author == inc["creator"] else NOTE_LINES_ENGINEER)
-            cur.execute(
-                "INSERT INTO incident_notes (incident_id, author_id, body, created_at) VALUES (%s, %s, %s, %s)",
-                (inc["id"], author, body, t),
-            )
-
-
-def seed_escalations(cur, incidents, admin_ids):
-    # Only the assigned engineer may request an escalation, so skip unassigned incidents.
-    candidates_up = [
-        i for i in incidents if i["priority"] != "Critical" and i["assigned_to"]
-    ]
-    random.shuffle(candidates_up)
-    n = min(10, len(candidates_up))
-    chosen = candidates_up[:n]
-
-    for idx, inc in enumerate(chosen):
-        requested_at = inc["created_at"] + timedelta(hours=random.uniform(1, 12))
-        if idx < 4 and PRIORITY_ORDER.index(inc["priority"]) > 0:
-            # Approved: incident's stored priority already reflects the escalated value.
-            current_priority = PRIORITY_ORDER[PRIORITY_ORDER.index(inc["priority"]) - 1]
-            requested_priority = inc["priority"]
-            status = "Approved"
-        else:
-            current_priority = inc["priority"]
-            requested_priority = priority_above(inc["priority"], random.choice([1, 2]))
-            status = random.choice(["Pending", "Rejected"])
-            if requested_priority == current_priority:
-                continue
-
-        decided_by = None
-        decided_at = None
-        if status in ("Approved", "Rejected"):
-            decided_by = random.choice(admin_ids)
-            decided_at = requested_at + timedelta(hours=random.uniform(2, 48))
-
+def seed_escalations(cur, users, now):
+    admin_id = users[ADMIN_NAMES[0]]
+    for index, current, requested, status, reason in ESCALATIONS:
+        spec = INCIDENTS[index]
+        requested_at = now - timedelta(days=spec["days_ago"]) + timedelta(hours=8)
+        decided = (admin_id, requested_at + timedelta(hours=6)) if status != "Pending" else (None, None)
         cur.execute(
             """INSERT INTO escalation_requests
                (incident_id, requested_by, current_priority, requested_priority, reason, status,
                 decided_by, decided_at, created_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (inc["id"], inc["assigned_to"], current_priority, requested_priority,
-             "Impact has grown; requesting a higher priority to get faster attention.",
-             status, decided_by, decided_at, requested_at),
+            (spec["id"], users[spec["engineer"]], current, requested, reason, status,
+             decided[0], decided[1], requested_at),
         )
 
 
@@ -362,18 +334,16 @@ TABLES = [
 
 
 def main():
-    global NOW
     with connect() as conn:
         with conn.cursor() as cur:
             cur.execute("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE")
             cur.execute("SELECT now()")
-            NOW = cur.fetchone()[0]
+            now = cur.fetchone()[0]
 
-            admin_ids, engineer_ids, employee_ids = seed_users(cur)
+            users = seed_users(cur)
             layout = seed_facilities(cur)
-            incidents = seed_incidents(cur, admin_ids, engineer_ids, employee_ids, layout)
-            seed_notes(cur, incidents)
-            seed_escalations(cur, incidents, admin_ids)
+            seed_incidents(cur, users, layout, now)
+            seed_escalations(cur, users, now)
 
             counts = {}
             for table in TABLES:

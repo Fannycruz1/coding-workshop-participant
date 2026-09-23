@@ -11,7 +11,7 @@ from seed import ADMIN_NAMES, DEMO_PASSWORD, EMPLOYEE_NAMES, ENGINEERS, email_fo
 # Exactly the accounts seed.py creates, rebuilt the same way it builds them.
 SEEDED_EMAILS = (
     {"admin@acme.inc", email_for(ADMIN_NAMES[1])}
-    | {email_for(name) for name, _ in ENGINEERS}
+    | {email_for(name) for name, *_ in ENGINEERS}
     | {"employee@acme.inc"}
     | {email_for(name) for name in EMPLOYEE_NAMES[1:]}
 )
