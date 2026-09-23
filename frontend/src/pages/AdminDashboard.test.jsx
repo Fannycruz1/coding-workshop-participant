@@ -6,10 +6,9 @@ import App from '../App'
 import { AuthProvider } from '../AuthProvider'
 import { PAGE_SIZE } from '../lib/constants'
 
-const SESSION = {
-  token: 'header.payload.signature',
-  user: { id: 1, email: 'admin@acme.inc', full_name: 'Priya', role: 'facility_admin', is_active: true },
-}
+// The stubbed /me below is what signs this admin in — the session cookie is
+// HttpOnly, so there is nothing for a test to plant in storage.
+const ADMIN = { id: 1, email: 'admin@acme.inc', full_name: 'Priya', role: 'facility_admin', is_active: true }
 
 const incident = (id) => ({
   id, title: `Incident ${id}`, description: null, category: 'HVAC', status: 'Open',
@@ -19,7 +18,7 @@ const incident = (id) => ({
 })
 
 const BODIES = {
-  '/me': SESSION.user,
+  '/me': ADMIN,
   '/buildings': { buildings: [{ id: 1, name: 'HQ', address: null }] },
   '/floors': { floors: [{ id: 10, building_id: 1, floor_number: 1, name: null }] },
   '/seats': { seats: [{ id: 100, floor_id: 10, seat_code: 'A-1' }] },
@@ -57,7 +56,6 @@ const renderAdmin = () => act(async () => {
 beforeEach(() => {
   cleanup()
   calls.length = 0
-  localStorage.setItem('acme.auth', JSON.stringify(SESSION))
   vi.stubGlobal('fetch', vi.fn(answer))
 })
 

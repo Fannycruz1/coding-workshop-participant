@@ -5,12 +5,12 @@ import { apiFetch } from '../api'
 import { useAuth } from '../useAuth'
 
 export default function Register() {
-  const { token, login } = useAuth()
+  const { user, login } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  if (token) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
 
   async function onSubmit(event) {
     event.preventDefault()

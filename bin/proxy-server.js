@@ -102,7 +102,9 @@ const server = http.createServer((req, res) => {
       'content-type': headers['content-type'] || 'application/json',
       'user-agent': headers['user-agent'] || 'proxy-server',
       'host': target.host,
-      ...(headers.authorization && { 'authorization': headers.authorization })
+      ...(headers.authorization && { 'authorization': headers.authorization }),
+      // The session cookie is HttpOnly, so this is the only way it reaches the Lambda.
+      ...(headers.cookie && { 'cookie': headers.cookie })
     }
   };
 

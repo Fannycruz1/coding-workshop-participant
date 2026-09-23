@@ -7,7 +7,7 @@ import psycopg
 from pydantic import ValidationError
 
 import repo
-from auth import bearer_claims, create_access_token
+from auth import create_access_token, request_claims, session_cookie
 from models import (
     EngineerCreateRequest,
     EngineerUpdate,
@@ -26,12 +26,11 @@ ADMIN_ROLE = "facility_admin"
 PUBLIC_FIELDS = ("id", "email", "full_name", "role", "is_active")
 
 
-def respond(status, payload):
-    return {
-        "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(payload),
-    }
+def respond(status, payload, cookie=None):
+    headers = {"Content-Type": "application/json"}
+    if cookie:
+        headers["Set-Cookie"] = cookie
+    return {"statusCode": status, "headers": headers, "body": json.dumps(payload)}
 
 
 def public_user(row):
@@ -73,7 +72,9 @@ def login(event):
         return respond(401, {"error": "invalid email or password"})
     user = public_user(row[:-1])
     token = create_access_token({"sub": str(user["id"]), "role": user["role"]})
-    return respond(200, {"token": token, "user": user})
+    # The cookie is what the browser uses. The token stays in the body for API
+    # clients with no cookie jar — curl and the smoke tests. The app ignores it.
+    return respond(200, {"token": token, "user": user}, cookie=session_cookie(token))
 
 
 def me(claims):
@@ -136,8 +137,12 @@ def handler(event=None, context=None):
             return register(event)
         if (method, path) == ("POST", "/login"):
             return login(event)
+        # Before the token gate on purpose: clearing the cookie must work even
+        # when the session it holds has already expired.
+        if (method, path) == ("POST", "/logout"):
+            return respond(200, {"logged_out": True}, cookie=session_cookie(expires_in=0))
 
-        claims = bearer_claims(event)
+        claims = request_claims(event)
         if not claims:
             return respond(401, {"error": "missing or invalid token"})
 

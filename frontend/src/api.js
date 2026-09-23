@@ -1,7 +1,5 @@
 import { useCallback } from 'react'
 
-import { useAuth } from './useAuth'
-
 // Every call goes through bin/proxy-server.js, which maps /api/<service>/<route>
 // onto that service's Lambda Function URL.
 //
@@ -12,13 +10,15 @@ import { useAuth } from './useAuth'
 const BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '')
 
 /** Calls the backend and unwraps JSON. Non-2xx throws the API's own error message. */
-export async function apiFetch(path, { token, body, ...options } = {}) {
+export async function apiFetch(path, { body, ...options } = {}) {
   const response = await fetch(`${BASE}/api${path}`, {
     ...options,
     body,
+    // Send the HttpOnly session cookie. Same-origin would cover both stacks today;
+    // being explicit keeps it working if the API ever moves to its own domain.
+    credentials: 'include',
     headers: {
       ...(body && { 'Content-Type': 'application/json' }),
-      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
   })
@@ -28,8 +28,8 @@ export async function apiFetch(path, { token, body, ...options } = {}) {
   return data
 }
 
-/** apiFetch with the logged-in token already attached — every dashboard call needs it. */
+/** apiFetch, re-exported as a hook so call sites keep one way in. The session
+ * cookie rides along on its own, so there is nothing left to attach. */
 export function useApi() {
-  const { token } = useAuth()
-  return useCallback((path, options) => apiFetch(path, { ...options, token }), [token])
+  return useCallback((path, options) => apiFetch(path, options), [])
 }

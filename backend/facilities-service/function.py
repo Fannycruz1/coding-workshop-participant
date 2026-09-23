@@ -11,7 +11,7 @@ import psycopg
 from pydantic import ValidationError
 
 import repo
-from auth import bearer_claims
+from auth import request_claims
 from models import (
     BuildingCreate,
     BuildingUpdate,
@@ -148,7 +148,7 @@ def handler(event=None, context=None):
 
     try:
         # Permission gate first: nothing below runs for a caller who isn't allowed.
-        claims = bearer_claims(event)
+        claims = request_claims(event)
         if not claims:
             return respond(401, {"error": "missing or invalid token"})
         if not segments:

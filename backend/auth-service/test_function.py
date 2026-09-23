@@ -12,15 +12,30 @@ ADMIN = "admin@acme.inc"
 EMPLOYEE = "employee@acme.inc"
 
 
-def call(method, path, body=None, token=None):
+def call(method, path, body=None, token=None, cookie=None):
+    headers = {}
+    if token:
+        headers["authorization"] = f"Bearer {token}"
+    if cookie:
+        headers["cookie"] = f"acme_session={cookie}"
     event = {
         "requestContext": {"http": {"method": method}},
         "rawPath": path,
-        "headers": {"authorization": f"Bearer {token}"} if token else {},
+        "headers": headers,
         "body": json.dumps(body) if body is not None else None,
     }
     res = handler(event, None)
     return res["statusCode"], json.loads(res["body"])
+
+
+def raw_call(method, path, body=None):
+    """The whole Lambda response, for the tests that care about Set-Cookie."""
+    return handler({
+        "requestContext": {"http": {"method": method}},
+        "rawPath": path,
+        "headers": {},
+        "body": json.dumps(body) if body is not None else None,
+    }, None)
 
 
 def login(email, password=PASSWORD):
@@ -274,3 +289,32 @@ def test_delete_engineer_keeps_their_audit_trail(engineer):
 def test_engineer_routes_are_admin_only(method, path):
     assert call(method, path, {"phone": "x"}, token=login(EMPLOYEE))[0] == 403
     assert call(method, path, {"phone": "x"})[0] == 401
+
+
+def test_login_sets_session_cookie():
+    res = raw_call("POST", "/login", {"email": EMPLOYEE, "password": PASSWORD})
+    cookie = res["headers"]["Set-Cookie"]
+    assert cookie.startswith("acme_session=")
+    assert "HttpOnly" in cookie
+    # The token stays in the body for curl and the smoke tests.
+    assert json.loads(res["body"])["token"]
+
+
+def test_cookie_alone_authenticates():
+    token = login(EMPLOYEE)
+    status, body = call("GET", "/me", cookie=token)
+    assert status == 200, body
+    assert body["email"] == EMPLOYEE
+
+
+def test_bad_cookie_is_401():
+    status, _ = call("GET", "/me", cookie="not-a-jwt")
+    assert status == 401
+
+
+def test_logout_clears_cookie_without_a_session():
+    # Logout sits before the token gate: an expired session must still be clearable.
+    res = raw_call("POST", "/logout")
+    assert res["statusCode"] == 200
+    assert "acme_session=; Max-Age=0" in res["headers"]["Set-Cookie"]
+

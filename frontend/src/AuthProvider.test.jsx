@@ -7,10 +7,7 @@ import { apiFetch } from './api'
 
 vi.mock('./api', () => ({ apiFetch: vi.fn() }))
 
-const SESSION = {
-  token: 'header.payload.signature',
-  user: { id: 1, email: 'employee@acme.inc', full_name: 'Employee', role: 'employee', is_active: true },
-}
+const USER = { id: 1, email: 'employee@acme.inc', full_name: 'Employee', role: 'employee', is_active: true }
 
 // Probe: renders the auth state and exposes login/logout to the test.
 let auth
@@ -28,59 +25,61 @@ beforeEach(() => {
   vi.resetAllMocks()
 })
 
-test('login stores token and user', async () => {
-  apiFetch.mockResolvedValue(SESSION)
-  renderApp()
+test('login sets the user and stores no token anywhere', async () => {
+  apiFetch.mockResolvedValue({ user: USER })
+  await act(async () => { renderApp() })
 
   await act(() => auth.login('employee@acme.inc', 'Password123!'))
 
   expect(apiFetch).toHaveBeenCalledWith('/auth-service/login', expect.objectContaining({ method: 'POST' }))
   expect(screen.getByText('employee@acme.inc')).toBeDefined()
-  expect(JSON.parse(localStorage.getItem('acme.auth'))).toEqual(SESSION)
+  // The session is an HttpOnly cookie. Nothing readable by script may hold it.
+  expect(localStorage.length).toBe(0)
+  expect(auth.token).toBeUndefined()
 })
 
-test('login failure leaves nothing stored', async () => {
+test('login failure leaves you logged out', async () => {
   apiFetch.mockRejectedValue(new Error('invalid email or password'))
-  renderApp()
+  await act(async () => { renderApp() })
 
   await expect(act(() => auth.login('employee@acme.inc', 'wrong'))).rejects.toThrow('invalid email or password')
-  expect(localStorage.getItem('acme.auth')).toBeNull()
+  expect(screen.getByText('logged out')).toBeDefined()
 })
 
-test('a stored session is validated against /me on mount', async () => {
-  localStorage.setItem('acme.auth', JSON.stringify(SESSION))
-  apiFetch.mockResolvedValue({ ...SESSION.user, full_name: 'Renamed Since Login' })
+test('the cookie is checked against /me on every mount', async () => {
+  apiFetch.mockResolvedValue(USER)
 
   await act(async () => { renderApp() })
 
-  expect(apiFetch).toHaveBeenCalledWith('/auth-service/me', { token: SESSION.token })
-  expect(auth.user.full_name).toBe('Renamed Since Login')
+  // No token argument: the cookie rides along on its own.
+  expect(apiFetch).toHaveBeenCalledWith('/auth-service/me')
+  expect(auth.user.email).toBe('employee@acme.inc')
 })
 
-test('a stored session the backend rejects is discarded', async () => {
-  localStorage.setItem('acme.auth', JSON.stringify(SESSION))
+test('a cookie the backend rejects leaves you logged out', async () => {
   apiFetch.mockRejectedValue(new Error('missing or invalid token'))
 
   await act(async () => { renderApp() })
 
   expect(screen.getByText('logged out')).toBeDefined()
-  expect(localStorage.getItem('acme.auth')).toBeNull()
+  expect(auth.user).toBeNull()
 })
 
-test('no /me call when there is no stored session', async () => {
+test('routes are held on loading until /me answers', () => {
+  apiFetch.mockReturnValue(new Promise(() => {}))
+  renderApp()
+
+  // Without this the app flashes a logged-out UI before the cookie is checked.
+  expect(screen.getByText('loading')).toBeDefined()
+})
+
+test('logout asks the server to clear the cookie', async () => {
+  apiFetch.mockResolvedValue(USER)
   await act(async () => { renderApp() })
 
-  expect(apiFetch).not.toHaveBeenCalled()
+  await act(() => auth.logout())
+
+  // Only the server can clear its own HttpOnly cookie — dropping local state is not logout.
+  expect(apiFetch).toHaveBeenCalledWith('/auth-service/logout', { method: 'POST' })
   expect(screen.getByText('logged out')).toBeDefined()
-})
-
-test('logout clears storage', async () => {
-  apiFetch.mockResolvedValue(SESSION)
-  renderApp()
-  await act(() => auth.login('employee@acme.inc', 'Password123!'))
-
-  act(() => auth.logout())
-
-  expect(screen.getByText('logged out')).toBeDefined()
-  expect(localStorage.getItem('acme.auth')).toBeNull()
 })

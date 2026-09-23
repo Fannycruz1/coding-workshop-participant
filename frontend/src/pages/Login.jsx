@@ -4,12 +4,12 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 
 export default function Login() {
-  const { token, login } = useAuth()
+  const { user, login } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  if (token) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
 
   async function onSubmit(event) {
     event.preventDefault()

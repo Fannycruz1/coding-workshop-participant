@@ -6,7 +6,7 @@ Two read-only queries, so the SQL lives here rather than in a repo.py.
 import json
 import logging
 
-from auth import bearer_claims
+from auth import request_claims
 from db import connect
 
 logger = logging.getLogger()
@@ -63,7 +63,7 @@ def handler(event=None, context=None):
 
     try:
         # Permission gate first: every route here is admin only.
-        claims = bearer_claims(event)
+        claims = request_claims(event)
         if not claims:
             return respond(401, {"error": "missing or invalid token"})
         if claims.get("role") != ADMIN_ROLE:
