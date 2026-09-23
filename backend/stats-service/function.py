@@ -57,9 +57,11 @@ def categories():
 
 def handler(event=None, context=None):
     event = event or {}
-    # proxy-server.js joins its base URL and the path into "//stats/hotspots" —
-    # drop the empty pieces so a route matches either way.
+    # Two shapes reach us: proxy-server.js doubles a slash into "//stats", and
+    # CloudFront forwards "/api/stats-service/stats" unrewritten. Normalise both.
     segments = [s for s in (event.get("rawPath") or "").split("/") if s]
+    if segments[:1] == ["api"]:
+        segments = segments[2:]
 
     try:
         # Permission gate first: every route here is admin only.

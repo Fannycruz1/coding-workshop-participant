@@ -260,9 +260,11 @@ def route(method, segments, event, claims):
 def handler(event=None, context=None):
     event = event or {}
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
-    # proxy-server.js joins its base URL and the path into "//incidents" — strip
-    # both ends so a route matches whether or not the slashes doubled up.
+    # Two shapes reach us: proxy-server.js doubles a slash into "//incidents", and
+    # CloudFront forwards "/api/incidents-service/incidents" unrewritten. Normalise both.
     segments = [s for s in (event.get("rawPath") or "").split("/") if s]
+    if segments[:1] == ["api"]:
+        segments = segments[2:]
 
     try:
         # Permission gate first: nothing below runs for a caller who isn't allowed.

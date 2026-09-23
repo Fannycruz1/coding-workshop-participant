@@ -127,9 +127,12 @@ def delete_engineer(user_id):
 def handler(event=None, context=None):
     event = event or {}
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
-    # proxy-server.js joins its base URL and the path into "//login" — strip both
-    # ends so a route matches whether or not the slashes doubled up.
-    path = "/" + (event.get("rawPath") or "").strip("/")
+    # Two shapes reach us: proxy-server.js doubles a slash into "//login", and
+    # CloudFront forwards "/api/auth-service/login" unrewritten. Normalise both.
+    segments = [s for s in (event.get("rawPath") or "").split("/") if s]
+    if segments[:1] == ["api"]:
+        segments = segments[2:]
+    path = "/" + "/".join(segments)
 
     try:
         # Permission gate first: nothing below runs for a caller who isn't allowed.
@@ -149,8 +152,7 @@ def handler(event=None, context=None):
         if (method, path) == ("GET", "/me"):
             return me(claims)
 
-        segments = path.strip("/").split("/")
-        if segments[0] == "engineers":
+        if segments[:1] == ["engineers"]:
             if claims.get("role") != ADMIN_ROLE:
                 return respond(403, {"error": "admin only"})
             if len(segments) == 1:

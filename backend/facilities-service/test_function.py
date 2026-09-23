@@ -201,3 +201,10 @@ def test_unknown_route(employee):
 def test_double_slash_path(employee):
     # The dev proxy forwards "//buildings"; it must reach the same route.
     assert call("GET", "//buildings", token=employee)[0] == 200
+
+
+def test_the_cloudfront_path_routes_like_the_bare_one(employee):
+    """CloudFront forwards "/api/facilities-service/buildings" unrewritten."""
+    bare = call("GET", "/buildings", token=employee)
+    assert call("GET", "/api/facilities-service/buildings", token=employee) == bare
+    assert bare[0] == 200

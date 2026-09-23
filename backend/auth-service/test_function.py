@@ -318,3 +318,14 @@ def test_logout_clears_cookie_without_a_session():
     assert res["statusCode"] == 200
     assert "acme_session=; Max-Age=0" in res["headers"]["Set-Cookie"]
 
+
+def test_the_cloudfront_path_routes_like_the_bare_one():
+    """CloudFront forwards "/api/auth-service/login" unrewritten — it must still log in.
+
+    Nothing rewrites the URI between CloudFront and the Function URL, so the
+    deployed stack only ever sends this shape. Unstripped it fell past /login to
+    the token gate and every request on AWS came back 401.
+    """
+    status, body = call("POST", "/api/auth-service/login", {"email": ADMIN, "password": PASSWORD})
+    assert status == 200, body
+    assert body["user"]["email"] == ADMIN

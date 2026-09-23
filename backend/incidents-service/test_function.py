@@ -318,3 +318,10 @@ def test_reporter_cannot_delete(employee, make_incident):
 def test_delete_missing_is_404(admin):
     status, _ = call("DELETE", "/incidents/99999999", token=admin)
     assert status == 404
+
+
+def test_the_cloudfront_path_routes_like_the_bare_one(employee):
+    """CloudFront forwards "/api/incidents-service/incidents" unrewritten."""
+    bare = call("GET", "/incidents", token=employee)
+    assert call("GET", "/api/incidents-service/incidents", token=employee) == bare
+    assert bare[0] == 200

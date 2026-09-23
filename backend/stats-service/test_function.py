@@ -112,3 +112,10 @@ def test_categories_cover_every_incident(admin):
     for entry in body["categories"]:
         assert entry["count"] == count("category = %s", (entry["category"],))
     assert sum(c["count"] for c in body["categories"]) == count("TRUE")
+
+
+def test_the_cloudfront_path_routes_like_the_bare_one(admin):
+    """CloudFront forwards "/api/stats-service/stats/categories" unrewritten."""
+    bare = call("/stats/categories", token=admin)
+    assert call("/api/stats-service/stats/categories", token=admin) == bare
+    assert bare[0] == 200
