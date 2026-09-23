@@ -99,6 +99,19 @@ fi
 terraform apply -auto-approve
 echo "INFO: Infrastructure deployment complete!"
 
+# The database sits in the VPC with no public address, so the schema is applied
+# by a Lambda rather than from here. Without this a fresh stack comes up empty.
+MIGRATE_FN=$(terraform output -raw migrate_function_name 2>/dev/null || true)
+if [ -n "$MIGRATE_FN" ]; then
+    echo "INFO: Applying database schema via $MIGRATE_FN..."
+    MIGRATE_OUT=$(mktemp)
+    aws lambda invoke --function-name "$MIGRATE_FN" --cli-read-timeout 900 \
+        --payload '{}' --cli-binary-format raw-in-base64-out "$MIGRATE_OUT" > /dev/null
+    cat "$MIGRATE_OUT"; echo
+    grep -q errorMessage "$MIGRATE_OUT" && { echo "ERROR: migration failed"; exit 1; }
+    rm -f "$MIGRATE_OUT"
+fi
+
 # Display API endpoint
 if [ -n "$API_BASE_URL" ]; then
     echo ""

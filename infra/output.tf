@@ -45,3 +45,8 @@ output "jupyter_url" {
   description = "The URL of the JupyterHub instance"
   value       = data.aws_caller_identity.this.id == "000000000000" ? "http://localhost:8888" : try(one(aws_eks_cluster.this.*.endpoint), null)
 }
+
+output "migrate_function_name" {
+  description = "Lambda that applies db/schema.sql and seeds demo data"
+  value       = try(one(module.lambda_migrate[*].lambda_function_name), "")
+}
