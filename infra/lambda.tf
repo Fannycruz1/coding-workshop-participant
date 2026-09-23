@@ -11,7 +11,7 @@ module "lambda" {
   memory_size     = 128
   timeout         = 300
   tracing_mode    = "PassThrough"
-  build_in_docker = false
+  build_in_docker = true
   lambda_role     = local.lambda_role_arn
   store_on_s3     = data.aws_caller_identity.this.id != "000000000000"
   s3_bucket       = data.aws_caller_identity.this.id != "000000000000" ? format("%s-tfstate-%s", var.aws_project, local.app_id) : null

@@ -14,7 +14,7 @@ module "lambda_migrate" {
   runtime         = "python3.13"
   memory_size     = 512
   timeout         = 900 # the seed writes ~900 incidents a row at a time
-  build_in_docker = false
+  build_in_docker = true
   lambda_role     = local.lambda_role_arn
   store_on_s3     = true
   s3_bucket       = format("%s-tfstate-%s", var.aws_project, local.app_id)
