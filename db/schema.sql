@@ -127,6 +127,14 @@ CREATE INDEX IF NOT EXISTS idx_incidents_building_id ON incidents(building_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_fulltext ON incidents
     USING GIN (to_tsvector('english', title || ' ' || coalesce(description, '')));
 
+-- Logout puts the session token here so it stops working before it expires.
+-- The hash, not the token: a leaked backup of this table must not hand anyone a
+-- live session. Rows are dropped once expires_at passes, so it stays small.
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    token_hash CHAR(64) PRIMARY KEY,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

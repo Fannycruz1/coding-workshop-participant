@@ -28,12 +28,12 @@ def call(method, path, body=None, token=None, cookie=None):
     return res["statusCode"], json.loads(res["body"])
 
 
-def raw_call(method, path, body=None):
+def raw_call(method, path, body=None, cookie=None):
     """The whole Lambda response, for the tests that care about Set-Cookie."""
     return handler({
         "requestContext": {"http": {"method": method}},
         "rawPath": path,
-        "headers": {},
+        "headers": {"cookie": f"acme_session={cookie}"} if cookie else {},
         "body": json.dumps(body) if body is not None else None,
     }, None)
 
@@ -310,6 +310,23 @@ def test_cookie_alone_authenticates():
 def test_bad_cookie_is_401():
     status, _ = call("GET", "/me", cookie="not-a-jwt")
     assert status == 401
+
+
+def test_logout_kills_a_captured_token():
+    """The whole point of revocation: the cookie is gone, the token must be too."""
+    token = login(EMPLOYEE)
+    assert call("GET", "/me", token=token)[0] == 200
+    assert raw_call("POST", "/logout", cookie=token)["statusCode"] == 200
+    # Same token, replayed the way a captured copy would be.
+    assert call("GET", "/me", token=token)[0] == 401
+    assert call("GET", "/me", cookie=token)[0] == 401
+
+
+def test_logout_leaves_other_sessions_alone():
+    """Logging out one browser must not sign the same user out everywhere."""
+    phone, laptop = login(EMPLOYEE), login(ADMIN)
+    raw_call("POST", "/logout", cookie=phone)
+    assert call("GET", "/me", token=laptop)[0] == 200
 
 
 def test_logout_clears_cookie_without_a_session():

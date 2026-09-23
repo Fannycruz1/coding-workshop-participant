@@ -1,9 +1,12 @@
 """JWT create/decode. Duplicated per Lambda folder — keep identical across services."""
 
+import hashlib
 import os
 import time
 
 import jwt
+
+from db import connect
 
 ALGORITHM = "HS256"
 DEFAULT_EXPIRY = 8 * 60 * 60  # seconds
@@ -51,20 +54,60 @@ def cookie_token(event: dict, headers: dict) -> str | None:
     return None
 
 
-def request_claims(event: dict) -> dict | None:
-    """Claims from the session cookie, or the Authorization header, or None.
+def request_token(event: dict) -> str | None:
+    """The raw session token: the cookie first, then Authorization.
 
     The cookie is how the browser authenticates — it is HttpOnly, so no script can
     read it. Bearer stays for API clients that have no cookie jar (the smoke tests).
     """
     headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
     token = cookie_token(event, headers)
-    if not token:
-        value = headers.get("authorization", "")
-        if not value.lower().startswith("bearer "):
-            return None
-        token = value[7:]
+    if token:
+        return token
+    value = headers.get("authorization", "")
+    return value[7:] if value.lower().startswith("bearer ") else None
+
+
+def fingerprint(token: str) -> str:
+    """What the denylist stores. Never the token itself — see db/schema.sql."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def revoke(token: str) -> None:
+    """Stop this exact token working, for as long as it would have been valid."""
     try:
-        return decode_access_token(token)
+        exp = decode_access_token(token)["exp"]
+    except jwt.PyJWTError:
+        return  # already expired, or never ours: nothing to revoke
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO revoked_tokens (token_hash, expires_at)"
+            " VALUES (%s, to_timestamp(%s)) ON CONFLICT DO NOTHING",
+            (fingerprint(token), exp),
+        )
+        # Revoked tokens are dead once they expire. Clearing them here keeps the
+        # table bounded without a scheduled job to own.
+        conn.execute("DELETE FROM revoked_tokens WHERE expires_at < now()")
+
+
+def is_revoked(token: str) -> bool:
+    # ponytail: one indexed lookup per authenticated request. If it ever shows up
+    # in latency, the upgrade is short tokens plus a refresh endpoint.
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM revoked_tokens WHERE token_hash = %s", (fingerprint(token),)
+        ).fetchone()
+    return row is not None
+
+
+def request_claims(event: dict) -> dict | None:
+    """Claims for the caller, or None if there is no valid, unrevoked session."""
+    token = request_token(event)
+    if not token:
+        return None
+    try:
+        claims = decode_access_token(token)
     except jwt.PyJWTError:
         return None
+    # A signed, unexpired token is not enough: logout denies it before it expires.
+    return None if is_revoked(token) else claims

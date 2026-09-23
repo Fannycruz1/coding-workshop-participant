@@ -7,7 +7,7 @@ import psycopg
 from pydantic import ValidationError
 
 import repo
-from auth import create_access_token, request_claims, session_cookie
+from auth import create_access_token, request_claims, request_token, revoke, session_cookie
 from models import (
     EngineerCreateRequest,
     EngineerUpdate,
@@ -143,6 +143,11 @@ def handler(event=None, context=None):
         # Before the token gate on purpose: clearing the cookie must work even
         # when the session it holds has already expired.
         if (method, path) == ("POST", "/logout"):
+            # Clearing the cookie only logs out this browser. Deny the token too,
+            # or a copy captured beforehand keeps working until it expires.
+            token = request_token(event)
+            if token:
+                revoke(token)
             return respond(200, {"logged_out": True}, cookie=session_cookie(expires_in=0))
 
         claims = request_claims(event)
