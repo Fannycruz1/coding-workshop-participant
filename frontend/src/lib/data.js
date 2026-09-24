@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useApi } from '../api'
 
@@ -40,14 +40,25 @@ export function useIncidents(query) {
   const api = useApi()
   const [incidents, setIncidents] = useState([])
   const [error, setError] = useState(null)
+  const [loaded, setLoaded] = useState(false)
+  const [settled, setSettled] = useState(query)
+  const latest = useRef(0)
 
-  const reload = useCallback(() => (
-    api(`/incidents-service/incidents${query}`)
-      .then((data) => { setIncidents(data.incidents); setError(null) })
-      .catch((err) => setError(err.message))
-  ), [api, query])
+  // Wait for a pause in typing, so a search doesn't fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(query), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // Only the newest request may write, so a slow older response can't overwrite it.
+  const reload = useCallback(() => {
+    const mine = ++latest.current
+    return api(`/incidents-service/incidents${settled}`)
+      .then((data) => { if (mine === latest.current) { setIncidents(data.incidents); setError(null); setLoaded(true) } })
+      .catch((err) => { if (mine === latest.current) { setError(err.message); setLoaded(true) } })
+  }, [api, settled])
 
   useEffect(() => { reload() }, [reload])
 
-  return { incidents, error, reload }
+  return { incidents, error, loaded, reload }
 }

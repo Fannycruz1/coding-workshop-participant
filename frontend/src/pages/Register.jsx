@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 import { apiFetch } from '../api'
+import AuthShell from './AuthShell'
 import { useAuth } from '../useAuth'
 
 export default function Register() {
@@ -34,9 +35,8 @@ export default function Register() {
   }
 
   return (
-    <main className="narrow">
-      <h1>Create an account</h1>
-      <form className="card" onSubmit={onSubmit}>
+    <AuthShell title="Create an account">
+      <form className="stack" onSubmit={onSubmit}>
         <label htmlFor="full_name">Full name</label>
         <input id="full_name" name="full_name" required />
 
@@ -52,10 +52,10 @@ export default function Register() {
           <option value="facility_admin">Facility admin</option>
         </select>
 
-        <button type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
+        <button type="submit" className="primary block" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
       </form>
-      {error && <p role="alert">{error}</p>}
-      <p>Already have an account? <Link to="/login">Sign in</Link></p>
-    </main>
+      {error && <p role="alert" className="alert">{error}</p>}
+      <p className="muted auth-foot">Already have an account? <Link to="/login">Sign in</Link></p>
+    </AuthShell>
   )
 }

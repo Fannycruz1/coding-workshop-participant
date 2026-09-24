@@ -2,7 +2,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { beforeEach, expect, test } from 'vitest'
 
 import StatusBadge from './StatusBadge'
-import { STATUS_COLORS } from '../lib/constants'
+import { STATUSES } from '../lib/constants'
 
 beforeEach(cleanup)
 
@@ -11,19 +11,11 @@ test('renders the status label', () => {
   expect(screen.getByText('In Progress')).toBeDefined()
 })
 
-test('colours each status differently', () => {
-  render(<StatusBadge status="Closed" />)
-  const closed = screen.getByText('Closed').style.backgroundColor
-  cleanup()
-  render(<StatusBadge status="Open" />)
-  expect(screen.getByText('Open').style.backgroundColor).not.toBe(closed)
-})
-
-test('every schema status has a colour', () => {
-  for (const status of Object.keys(STATUS_COLORS)) {
+test('every schema status is keyed for its colour', () => {
+  for (const status of STATUSES) {
     cleanup()
     render(<StatusBadge status={status} />)
-    expect(screen.getByText(status).style.backgroundColor).not.toBe('')
+    expect(screen.getByText(status).dataset.status).toBe(status)
   }
 })
 

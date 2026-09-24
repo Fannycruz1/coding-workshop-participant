@@ -1,10 +1,4 @@
-import { STATUS_COLORS } from '../lib/constants'
-
-/** The status as a coloured pill. Unknown values still render, in grey. */
+/** The status as a tinted label; the colour comes from the CSS, keyed on data-status. */
 export default function StatusBadge({ status }) {
-  return (
-    <span className="badge" style={{ backgroundColor: STATUS_COLORS[status] || '#4b5563' }}>
-      {status}
-    </span>
-  )
+  return <span className="badge" data-status={status}>{status}</span>
 }

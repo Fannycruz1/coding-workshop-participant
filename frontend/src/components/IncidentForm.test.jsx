@@ -43,7 +43,7 @@ const fillValid = () => {
 test('an invalid form shows errors and does not submit', () => {
   const onSubmit = setup()
 
-  fireEvent.click(screen.getByRole('button', { name: /report/i }))
+  fireEvent.click(screen.getByRole('button', { name: /create incident/i }))
 
   expect(onSubmit).not.toHaveBeenCalled()
   expect(screen.getByRole('alert')).toBeDefined()
@@ -54,7 +54,7 @@ test('a valid form submits ids as numbers, with an optional seat', () => {
   fillValid()
   fireEvent.change(screen.getByLabelText(/Seat/), { target: { value: '100' } })
 
-  fireEvent.click(screen.getByRole('button', { name: /report/i }))
+  fireEvent.click(screen.getByRole('button', { name: /create incident/i }))
 
   expect(onSubmit).toHaveBeenCalledWith({
     title: 'Aircon dripping',
@@ -71,7 +71,7 @@ test('no seat chosen sends null, not an empty string', () => {
   const onSubmit = setup()
   fillValid()
 
-  fireEvent.click(screen.getByRole('button', { name: /report/i }))
+  fireEvent.click(screen.getByRole('button', { name: /create incident/i }))
 
   expect(onSubmit.mock.calls[0][0].seat_id).toBeNull()
 })
@@ -93,8 +93,8 @@ test('changing the building clears a floor that belongs to the old one', () => {
   fireEvent.change(screen.getByLabelText(/Seat/), { target: { value: '100' } })
 
   fireEvent.change(screen.getByLabelText('Building'), { target: { value: '2' } })
-  fireEvent.click(screen.getByRole('button', { name: /report/i }))
+  fireEvent.click(screen.getByRole('button', { name: /create incident/i }))
 
   expect(onSubmit).not.toHaveBeenCalled()
-  expect(screen.getByRole('alert').textContent).toMatch(/floor/i)
+  expect(screen.getByText('pick a floor')).toBeDefined()
 })

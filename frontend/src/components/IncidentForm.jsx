@@ -8,7 +8,12 @@ const EMPTY = {
   building_id: '', floor_id: '', seat_id: '',
 }
 
-export default function IncidentForm({ buildings, floors, seats, onSubmit, busy }) {
+const FieldError = ({ id, message }) => (
+  message ? <small id={`${id}-error`} className="field-error">{message}</small> : null
+)
+
+/** The report form. The reporter is never asked for: the server takes it from the session. */
+export default function IncidentForm({ buildings, floors, seats, onSubmit, onCancel, busy, error }) {
   const [values, setValues] = useState(EMPTY)
   const [errors, setErrors] = useState({})
 
@@ -27,11 +32,19 @@ export default function IncidentForm({ buildings, floors, seats, onSubmit, busy 
     }))
   }
 
+  const invalid = (name) => ({
+    'aria-invalid': !!errors[name],
+    'aria-describedby': errors[name] ? `${name}-error` : undefined,
+  })
+
   function submit(event) {
     event.preventDefault()
     const found = validate(values)
     setErrors(found)
-    if (Object.keys(found).length) return
+    if (Object.keys(found).length) {
+      document.getElementById(Object.keys(found)[0])?.focus()
+      return
+    }
 
     onSubmit({
       title: values.title.trim(),
@@ -42,26 +55,25 @@ export default function IncidentForm({ buildings, floors, seats, onSubmit, busy 
       floor_id: Number(values.floor_id),
       seat_id: values.seat_id ? Number(values.seat_id) : null,
     })
-    setValues(EMPTY)
   }
 
   return (
-    <form className="card" onSubmit={submit} noValidate>
-      <h3>Report an incident</h3>
-
+    <form className="stack form" onSubmit={submit} noValidate>
       <label htmlFor="title">Title</label>
-      <input id="title" value={values.title} onChange={set('title')} />
+      <input id="title" placeholder="A short description of the problem" {...invalid('title')} value={values.title} onChange={set('title')} />
+      <FieldError id="title" message={errors.title} />
 
       <label htmlFor="description">Description</label>
-      <textarea id="description" rows="3" value={values.description} onChange={set('description')} />
+      <textarea id="description" rows="4" placeholder="What is happening, and what is affected?" value={values.description} onChange={set('description')} />
 
       <div className="row">
         <div>
           <label htmlFor="category">Category</label>
-          <select id="category" value={values.category} onChange={set('category')}>
+          <select id="category" {...invalid('category')} value={values.category} onChange={set('category')}>
             <option value="">Choose…</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          <FieldError id="category" message={errors.category} />
         </div>
         <div>
           <label htmlFor="priority">Priority</label>
@@ -71,37 +83,42 @@ export default function IncidentForm({ buildings, floors, seats, onSubmit, busy 
         </div>
       </div>
 
-      <div className="row">
-        <div>
-          <label htmlFor="building_id">Building</label>
-          <select id="building_id" value={values.building_id} onChange={set('building_id')}>
-            <option value="">Choose…</option>
-            {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+      <fieldset>
+        <legend>Location</legend>
+        <div className="row">
+          <div>
+            <label htmlFor="building_id">Building</label>
+            <select id="building_id" {...invalid('building_id')} value={values.building_id} onChange={set('building_id')}>
+              <option value="">Choose…</option>
+              {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <FieldError id="building_id" message={errors.building_id} />
+          </div>
+          <div>
+            <label htmlFor="floor_id">Floor</label>
+            <select id="floor_id" {...invalid('floor_id')} value={values.floor_id} onChange={set('floor_id')} disabled={!values.building_id}>
+              <option value="">{!values.building_id ? 'Pick a building first' : ourFloors.length ? 'Choose…' : 'No floors listed'}</option>
+              {ourFloors.map((f) => <option key={f.id} value={f.id}>{f.name || `Floor ${f.floor_number}`}</option>)}
+            </select>
+            <FieldError id="floor_id" message={errors.floor_id} />
+          </div>
+          <div>
+            <label htmlFor="seat_id">Seat (optional)</label>
+            <select id="seat_id" value={values.seat_id} onChange={set('seat_id')} disabled={!values.floor_id}>
+              <option value="">{!values.floor_id ? 'Pick a floor first' : 'None'}</option>
+              {ourSeats.map((s) => <option key={s.id} value={s.id}>{s.seat_code}</option>)}
+            </select>
+          </div>
         </div>
-        <div>
-          <label htmlFor="floor_id">Floor</label>
-          <select id="floor_id" value={values.floor_id} onChange={set('floor_id')} disabled={!values.building_id}>
-            <option value="">Choose…</option>
-            {ourFloors.map((f) => (
-              <option key={f.id} value={f.id}>{f.name || `Floor ${f.floor_number}`}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="seat_id">Seat (optional)</label>
-          <select id="seat_id" value={values.seat_id} onChange={set('seat_id')} disabled={!values.floor_id}>
-            <option value="">None</option>
-            {ourSeats.map((s) => <option key={s.id} value={s.id}>{s.seat_code}</option>)}
-          </select>
-        </div>
+      </fieldset>
+
+      {Object.keys(errors).length > 0 && <p role="alert" className="alert">Please fix the highlighted fields.</p>}
+      {error && <p role="alert" className="alert">{error}</p>}
+
+      <div className="modal-actions">
+        {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+        <button type="submit" className="primary" disabled={busy}>{busy ? 'Creating…' : 'Create Incident'}</button>
       </div>
-
-      {Object.keys(errors).length > 0 && (
-        <p role="alert">{Object.values(errors).join(' · ')}</p>
-      )}
-
-      <button type="submit" disabled={busy}>{busy ? 'Reporting…' : 'Report incident'}</button>
     </form>
   )
 }

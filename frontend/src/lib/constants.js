@@ -6,8 +6,9 @@ export const CATEGORIES = [
   'AV/Conference Room', 'Printer', 'Access/Badge', 'Cleaning', 'Other',
 ]
 
-// Matches IncidentFilters.limit's default in the incidents service.
-export const PAGE_SIZE = 50
+// The incidents service's ceiling for `limit`. Lists load this many once and
+// search, filter and sort them in the browser.
+export const FETCH_LIMIT = 200
 
 export const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 
@@ -19,19 +20,4 @@ export const TRANSITIONS = {
   Blocked: ['In Progress'],
   Resolved: ['Closed', 'In Progress'],
   Closed: [],
-}
-
-export const STATUS_COLORS = {
-  Open: '#b45309',
-  'In Progress': '#1d4ed8',
-  Blocked: '#b91c1c',
-  Resolved: '#15803d',
-  Closed: '#4b5563',
-}
-
-export const PRIORITY_COLORS = {
-  Low: '#4b5563',
-  Medium: '#1d4ed8',
-  High: '#b45309',
-  Critical: '#b91c1c',
 }

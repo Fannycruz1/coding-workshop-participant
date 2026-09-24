@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 
+import AuthShell from './AuthShell'
 import { useAuth } from '../useAuth'
 
 export default function Login() {
@@ -27,19 +28,18 @@ export default function Login() {
   }
 
   return (
-    <main className="narrow">
-      <h1>ACME Facility Incidents</h1>
-      <form className="card" onSubmit={onSubmit}>
+    <AuthShell title="Sign in">
+      <form className="stack" onSubmit={onSubmit}>
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" autoComplete="username" required />
 
         <label htmlFor="password">Password</label>
         <input id="password" name="password" type="password" autoComplete="current-password" required />
 
-        <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" className="primary block" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
-      {error && <p role="alert">{error}</p>}
-      <p>No account yet? <Link to="/register">Create one</Link></p>
-    </main>
+      {error && <p role="alert" className="alert">{error}</p>}
+      <p className="muted auth-foot">No account yet? <Link to="/register">Create one</Link></p>
+    </AuthShell>
   )
 }
